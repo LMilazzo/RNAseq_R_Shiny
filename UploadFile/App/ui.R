@@ -22,6 +22,7 @@ ui <- navbarPage("Application",
       fluidPage(
         sidebarLayout(
 #______________________________Side Bar_________________________________#
+          
           sidebarPanel(
 
             #-----------------input----------------#

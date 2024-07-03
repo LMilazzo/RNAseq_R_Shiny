@@ -2,9 +2,13 @@
 library(readr)
 library(dplyr)
 
-#_______________________________________________UI Functions
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#~~~~~######_______________UI Functions_______________######~~~~~#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-# File Upload
+#~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------File Upload--------#
+#~~~~~~~~~~Widget~~~~~~~~~~#
 # Creates a widget for a file upload
 # @param Identifing name for the uploaded file
 # @param statement to be displayed near the widget
@@ -14,7 +18,9 @@ FileUpload <- function(widget_Identfier, widget_Statement){
   
 }
 
-# File Preview
+#~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------File Preview-------#
+#~~~~~~~~~~Widget~~~~~~~~~~#
 # Creates a widget for a selecting what preview style should appear 
 # @param Identifing name for the preview type describing which object it belongs to
 # @param statement to be displayed near the widget
@@ -28,10 +34,13 @@ FilePreviewSize <- function(widget_Identfier, widget_Statement){
 }
 
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#~~~~~######_____________Server Functions_____________######~~~~~#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-#_______________________________________________Server Functions
-
-#Set Clean Counts
+#~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-----Set Clean Counts-----#
+#~~~~~~~~~~~Func~~~~~~~~~~~#
 #Reads from the File upload containing the counts matrix. Counts matrix is 
 #handled to return to the global data frame raw_counts in the correct and 
 #following format:
@@ -65,7 +74,9 @@ Set_Clean_Counts <- function(raw_counts_table){
   return( list(count, gene_names) )
 }
 
-#Make Preview Table
+#~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#----Make Preview Table----#
+#~~~~~~~~~~~Func~~~~~~~~~~~#
 #based on the table and view settings returns the right rows/columns to turn
 #into a data table
 #@param the data frame or matrix to view

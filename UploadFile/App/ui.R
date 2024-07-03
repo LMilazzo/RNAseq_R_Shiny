@@ -7,109 +7,105 @@ library(dplyr)
 library(readr)
 source("Functions.R")
 
-
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
-#_________________________Create Navigation Bar System__________________________
-
-ui <- navbarPage("Application",
-                 
-#_________________________Set Theme To sandstone________________________________
-   
+ui <- navbarPage("Application",  
    theme = shinytheme("sandstone"),
    
-##############################Page <- File Upload###############################
-   
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 1----------------------------------#
+#-----------------------------File Upload-------------------------------#
+#---------------------------Widget Count: 3-----------------------------#
+#-----------------------Expected output Count: 2------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
    tabPanel("File Upload",
-      
       fluidPage(
-        
-        #Sidebar layout displays widgets on a left sidebar and output object in 
-        #the main right panel
         sidebarLayout(
-        
-##############################Side Bar##########################################
-      
-          
-          #The sidebar panel contains widgets for this page
-          
-          #Expected Widgets for this sidebar
-          
-          # merged_gene_counts_uploaded_file
-            # An upload file widget for the merged gene counts tsv,csv
-          # raw_counts_matrix_Preview
-            # A preview settings select option to change size of the displayed
-            # raw_counts matrix returned from the Set Clean Counts function.
-
+#______________________________Side Bar_________________________________#
           sidebarPanel(
-            
-            # merged_gene_counts_uploaded_file
+
+            #-----------------input----------------#
+            #---merged_gene_counts_uploaded_file---#
+            #--------------------------------------#
+            # An upload file widget for the merged gene counts tsv,csv
             #          Object Name    
             FileUpload("merged_gene_counts_uploaded_file", 
             #          Widget Message 
                        "Upload Counts")
             
             ,
-            
-            # raw_counts_matrix_Preview
+
+            #-----------------input----------------#
+            #-------raw_counts_matrix_Preview------#
+            #--------------------------------------#
+            # A preview settings select option to change size of the displayed
+            # raw_counts matrix returned from the Set Clean Counts function.
             #                       Object Name      
             FilePreviewSize("raw_counts_matrix_Preview", 
             #                       Widget Message                
                             "Counts Matrix Preview")
             
             ,
-            
-            # geneID_geneName_Preview
+
+            #-----------------input----------------#
+            #--------geneID_geneName_Preview-------#
+            #--------------------------------------#
+            # A preview settings select option to change the size of the displayed
+            # dataframe containing gene ids and matching gene names
             #                       Object Name      
             FilePreviewSize("geneID_geneName_Preview", 
             #                       Widget Message                
                             "Gene Data Preview")
           
-            ),
+          ), ##XX##~~~Side Panel End~~~##XX##
           
-##########################Main Panel############################################
+#_____________________________Main Panel________________________________#
           
-          #The main panel contains output objects for this page
-          
-          #Expected possible output objects:
-          
-          #output$raw_counts_PreviewTable
+          mainPanel(
+
+            #----------------output----------------#
+            #--------raw_counts_PreviewTable-------#
+            #--------------------------------------#
             #A Data Table preview of what is inside the uploaded counts table 
             #after formating correctly
               #Expected Format:
                 #axis.names| Sample1 | Sample 2 | Sample 3
                 #Gene_ID_1 |    x    |    x     |    x
                 #Gene_ID_2 |    x    |    x     |    x
+            DTOutput('raw_counts_PreviewTable')
             
-          #output$geneID_geneName_PreviewTable
+            ,
+
+            #----------------output----------------#
+            #-----geneID_geneName_PreviewTable-----#
+            #--------------------------------------#
             #A Data Table preview of all gene ids and their gene names
               #Expected Format:
                 #axis.names|    gene    | gene_name
                 #   1      | Gene_ID_1  |   Actin    
                 #   2      | Gene_ID_2  |   COOR4_7    
+            DTOutput('geneID_geneName_PreviewTable')
+
+            ,
             
-          #output$sample_conditions_PreviewTable
+            #----------------output----------------#
+            #----sample_conditions_PreviewTable----#
+            #--------------------------------------#
             #A Data Table Preview of the samples and their respective conditions
               #Expected Format:
               # #axis.names|  Condition    
               #   T0.s1    |  T0  
               #   T96.s2   |  T96 
             #Condition column stored as a factored category.
+            #TO-DO
+            
+          )##XX##~~~Main Panel End~~~##XX##
           
-          mainPanel(
-            
-            DTOutput('raw_counts_PreviewTable')
-            
-            ,
-            
-            DTOutput('geneID_geneName_PreviewTable')
-            
-          )
-          
-        )
-      )
-    )
-)
+        )##XX##~~~Side Bar Layout Closing Bracket~~~##XX##
+      ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
+    ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
+                 
+)#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
    
    
      

@@ -63,7 +63,13 @@ ui <- navbarPage("Application",
 #_____________________________Main Panel________________________________#
           
           mainPanel(
-
+            
+            #Text output for any error will appear at the top
+            textOutput('errorMessages')
+            
+            ,
+            
+            
             #----------------output----------------#
             #--------raw_counts_PreviewTable-------#
             #--------------------------------------#
@@ -87,7 +93,7 @@ ui <- navbarPage("Application",
                 #   2      | Gene_ID_2  |   COOR4_7    
             DTOutput('geneID_geneName_PreviewTable')
 
-            ,
+            
             
             #----------------output----------------#
             #----sample_conditions_PreviewTable----#

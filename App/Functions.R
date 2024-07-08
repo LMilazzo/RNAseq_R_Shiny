@@ -58,6 +58,12 @@ FilePreviewSize <- function(widget_Identfier, widget_Statement){
 # @return gene_names data frame
 Set_Clean_Counts <- function(raw_counts_table){
   
+  if( !grepl('.tsv', raw_counts_table, fixed=TRUE)){
+    
+    return("Error: raw counts matrix upload expected a .tsv file")
+  
+  }
+  
   count <- read.csv(raw_counts_table, sep = "\t")
 
   gene_names <- count %>% 

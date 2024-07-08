@@ -1,7 +1,7 @@
 
-# Import Shiny
+
+
+# run_app.R
 library(shiny)
 
-#Run the app
-
-runApp('App')
+runApp('App', launch.browser = TRUE)

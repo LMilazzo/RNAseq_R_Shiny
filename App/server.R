@@ -13,17 +13,26 @@ server <- function(input, output) {
       #Upon submission of UI object [ merged_gene_counts_uploaded_file ]      
       
       #Goal:
-      #             |----->> gene_names
+      #             |#----->> gene_names
       #   input ----|
-      #             |----->> raw_counts
+      #             |#----->> raw_counts
 
       #Expect as return c(raw_counts, gene_names)           
       func_return <- Set_Clean_Counts(input$merged_gene_counts_uploaded_file$datapath)
       
-      raw_counts <<- data.frame(func_return[1])
-      
-      gene_names <<- data.frame(func_return[2])
-      
+      if(length(func_return) == 1){
+        output$errorMessages <- renderText({
+          func_return
+        })
+      }else{
+        
+        output$errorMessages <- NULL
+        
+        raw_counts <<- data.frame(func_return[1])
+        
+        gene_names <<- data.frame(func_return[2])
+        
+      }
     }             
   )
   
@@ -46,10 +55,24 @@ server <- function(input, output) {
     req(input$merged_gene_counts_uploaded_file)
     req(input$raw_counts_matrix_Preview)
     
-    #                 subject
-    makePreviewTable(raw_counts,input$raw_counts_matrix_Preview)
+    #                       subject         setting
+    df <- makePreviewTable(raw_counts,input$raw_counts_matrix_Preview)
     
-    }, rownames = TRUE
+    if(is.null(df)){
+      #Nothing is displayed if the preview table function comes back empty
+    }else{
+      df$gene <- row.names(df)
+      
+      #Some editing to display the gene names as well
+      df <- left_join(df, gene_names)
+      
+      df <-df %>% tibble::column_to_rownames('gene')
+      
+      data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
+      
+      }
+    
+    }, rownames = TRUE, caption= "Raw Counts"
   )
 
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -68,7 +91,7 @@ server <- function(input, output) {
       #                 subject
       makePreviewTable(gene_names,input$geneID_geneName_Preview)
       
-    }, rownames = TRUE
+    }, rownames = TRUE, caption= "Gene IDs & Gene name"
   )
   
   

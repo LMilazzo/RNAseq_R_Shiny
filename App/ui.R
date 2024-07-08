@@ -32,8 +32,7 @@ ui <- navbarPage("Application",
             #          Object Name    
             FileUpload("merged_gene_counts_uploaded_file", 
             #          Widget Message 
-                       "Upload Salmon Merged Counts Matrix \n
-                       Expects .tsv file")
+                       "Upload Salmon Merged Counts .tsv file")
             
             ,
 

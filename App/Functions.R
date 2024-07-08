@@ -104,3 +104,32 @@ makePreviewTable <- function(subject, setting){
   }
 }
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------Filter Counts------#
+#~~~~~~~~~~~Func~~~~~~~~~~~#
+#Takes raw_counts as input and returns a filtered version that removes low 
+#counts genes
+#@param raw_counts matrix
+#@return the matrix of filtered counts
+#@return the number of rows deleted
+filterCounts <- function(counts){
+
+  fcounts <- counts
+  
+  Srows <- nrow(fcounts)
+  
+  keep <- rowSums(fcounts) > 10
+  
+  fcounts <- fcounts[keep,]
+  
+  fcounts <- round(fcounts)
+  
+  fcounts <- as.matrix(fcounts)
+  
+  Erows <- nrow(fcounts)
+  
+  nFiltered <- Srows - Erows
+  
+  return( list(fcounts, nFiltered))
+}
+

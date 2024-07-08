@@ -9,14 +9,14 @@ source("Functions.R")
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
-ui <- navbarPage("Application",  
+ui <- navbarPage("DESeq2",  
    theme = shinytheme("sandstone"),
    
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 1----------------------------------#
 #-----------------------------File Upload-------------------------------#
 #---------------------------Widget Count: 3-----------------------------#
-#-----------------------Expected output Count: 2------------------------#
+#-----------------------Expected output Count: 3------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
    tabPanel("File Upload",
       fluidPage(
@@ -24,7 +24,11 @@ ui <- navbarPage("Application",
 #______________________________Side Bar_________________________________#
           
           sidebarPanel(
-
+            
+            HTML("<h1>Upload Data</h1>")
+            
+            ,
+            
             #-----------------input----------------#
             #---merged_gene_counts_uploaded_file---#
             #--------------------------------------#
@@ -32,9 +36,14 @@ ui <- navbarPage("Application",
             #          Object Name    
             FileUpload("merged_gene_counts_uploaded_file", 
             #          Widget Message 
-                       "Upload Salmon Merged Counts .tsv file")
+                       "Salmon Merged Counts .tsv file")
             
             ,
+            
+            HTML("<h1>View Data</h1>")
+            
+            ,
+            
 
             #-----------------input----------------#
             #-------raw_counts_matrix_Preview------#
@@ -65,7 +74,7 @@ ui <- navbarPage("Application",
           mainPanel(
             
             #Text output for any error will appear at the top
-            textOutput('errorMessages')
+            textOutput('errorMessagesPG1.0')
             
             ,
             
@@ -76,7 +85,7 @@ ui <- navbarPage("Application",
             #A Data Table preview of what is inside the uploaded counts table 
             #after formating correctly
               #Expected Format:
-                #axis.names| Sample1 | Sample 2 | Sample 3
+                #axis.names| geneName| Sample 2 | Sample 3
                 #Gene_ID_1 |    x    |    x     |    x
                 #Gene_ID_2 |    x    |    x     |    x
             DTOutput('raw_counts_PreviewTable')
@@ -111,6 +120,43 @@ ui <- navbarPage("Application",
         )##XX##~~~Side Bar Layout Closing Bracket~~~##XX##
       ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
     ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
+    
+    ,
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 2----------------------------------#
+#-----------------------------Filter Info-------------------------------#
+#---------------------------Widget Count: 0-----------------------------#
+#-----------------------Expected output Count: 2------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    tabPanel("DESeq2 and Filtering Info",
+      fluidPage(
+            
+            HTML("<h2>Filter Notes</h2>")
+        
+            ,
+            #----------------output----------------#
+            #---------------nFiltered--------------#
+            #--------------------------------------#
+            #A message stating how many rows were filtered
+            textOutput('nFiltered')
+            
+            ,
+            
+            #----------------output----------------#
+            #-----filtered_counts_PreviewTable-----#
+            #--------------------------------------#
+            #A Data Table preview of what is inside the filtered counts matrix 
+            #after filtering correctly
+              #Expected Format:
+              #axis.names| geneName| Sample 2 | Sample 3
+              #Gene_ID_1 |    x    |    x     |    x
+              #Gene_ID_2 |    x    |    x     |    x
+            #DTOutput('filtered_counts_PreviewTable')
+            
+      ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
+    ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
+            
                  
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
    

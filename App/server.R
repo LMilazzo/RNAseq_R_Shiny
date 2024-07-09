@@ -9,6 +9,7 @@ server <- function(input, output) {
   gene_names <- reactiveVal(NULL)
   filtered_counts <- reactiveVal(NULL)
   nFiltered <- reactiveVal(0)
+  metaData <- reactiveVal(NULL)
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -35,7 +36,7 @@ server <- function(input, output) {
         })
       }else{
         
-        output$errorMessages <- NULL
+        output$errorMessagesPG1.0 <- NULL
         
         raw_counts(data.frame(func_return[1]))
         
@@ -43,6 +44,47 @@ server <- function(input, output) {
         
       }
     }             
+  )
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #-----Observe UI Event------# ----> meta_data_conditions_uploaded_file
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  observeEvent(input$submit_meta_data,
+    {
+      
+      #Goal: Take in a csv meta data file and a given column that contains conditions 
+      #for the samples in the same order as the colnames of the other dataframe. 
+      #Asking for the column with the condition helps deal with some variability 
+      #in how people label their samples in the csv before using the app.
+      req(input$meta_data_conditions_uploaded_file)
+      req(input$merged_gene_counts_uploaded_file)
+      
+      metaDataFilePath  <- input$meta_data_conditions_uploaded_file$datapath
+      
+      if( !grepl('.csv',metaDataFilePath , fixed=TRUE)){
+        output$errorMessagesPG1.1 <- renderText({
+          "Error: Meta Data Table upload expected a .csv file"
+        })
+        return()
+      }else{output$errorMessagesPG1.1 <- NULL}
+      
+      md <- read.csv(metaDataFilePath)
+  
+      if(input$condition_factor_column > ncol(md) | input$condition_factor_column == 0 ){
+        output$errorMessagesPG1.2 <- renderText({
+          "Error: Not a valid column for the Meta Data .csv file"
+        })
+        return()
+      }else{output$errorMessagesPG1.2 <- NULL}
+      
+      cond <- factor(md[,input$condition_factor_column])
+      
+      coldata <- data.frame(cond)
+      
+      rownames(coldata) <- colnames(raw_counts())
+      
+      metaData(coldata)
+    }
   )
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#

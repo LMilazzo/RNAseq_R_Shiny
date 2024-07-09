@@ -15,7 +15,7 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 1----------------------------------#
 #-----------------------------File Upload-------------------------------#
-#---------------------------Widget Count: 3-----------------------------#
+#---------------------------Widget Count: 5-----------------------------#
 #-----------------------Expected output Count: 3------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
    tabPanel("File Upload",
@@ -66,6 +66,41 @@ ui <- navbarPage("DESeq2",
             FilePreviewSize("geneID_geneName_Preview", 
             #                       Widget Message                
                             "Gene Data Preview")
+            
+            ,
+            
+            HTML("<h1>Upload Meta Data</h1>")
+            
+            ,
+            
+            #-----------------input----------------#
+            #--meta_data_conditions_uploaded_file--#
+            #--------------------------------------#
+            # An upload file widget for the metadata .csv file
+            #          Object Name    
+            FileUpload("meta_data_conditions_uploaded_file", 
+                       #          Widget Message 
+                       "Conditions")
+            
+            ,
+            
+            HTML("<h4>Which Column are your conditions in?</h4>")
+            
+            ,
+            
+            #-----------------input----------------#
+            #--------condition_factor_column-------#
+            #--------------------------------------#
+            #An int input for which column of the metadata file has the conditions
+            numericInput("condition_factor_column", "Column #", min=1, value=0)
+            
+            ,
+            
+            #-----------------input----------------#
+            #-----------submit_meta_data-----------#
+            #--------------------------------------#
+            #A Submit button to confirm the meta data and condition column
+            actionButton("submit_meta_data", "Confirm file and column")
           
           ), ##XX##~~~Side Panel End~~~##XX##
           
@@ -73,7 +108,7 @@ ui <- navbarPage("DESeq2",
           
           mainPanel(
             
-            #Text output for any error will appear at the top
+            #Text output for error 1.0
             textOutput('errorMessagesPG1.0')
             
             ,
@@ -102,7 +137,15 @@ ui <- navbarPage("DESeq2",
                 #   2      | Gene_ID_2  |   COOR4_7    
             DTOutput('geneID_geneName_PreviewTable')
 
+            ,
             
+            #Text output for error 1.1
+            textOutput('errorMessagesPG1.1')
+            
+            ,
+            
+            #Text output for error 1.2
+            textOutput('errorMessagesPG1.2')
             
             #----------------output----------------#
             #----sample_conditions_PreviewTable----#

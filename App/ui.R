@@ -143,6 +143,10 @@ ui <- navbarPage("DESeq2",
             #--------------------------------------#
             #A message stating how many rows were filtered
             textOutput('nFiltered')
+
+            ,
+
+            nFiltered
             
             ,
             

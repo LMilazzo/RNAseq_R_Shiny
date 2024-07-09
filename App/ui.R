@@ -6,6 +6,7 @@ library(plyr)
 library(dplyr)
 library(readr)
 source("Functions.R")
+library(crayon)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -15,7 +16,7 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 1----------------------------------#
 #-----------------------------File Upload-------------------------------#
-#---------------------------Widget Count: 5-----------------------------#
+#---------------------------Widget Count: 2-----------------------------#
 #-----------------------Expected output Count: 3------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
    tabPanel("File Upload",
@@ -39,35 +40,7 @@ ui <- navbarPage("DESeq2",
                        "Salmon Merged Counts .tsv file")
             
             ,
-            
-            HTML("<h1>View Data</h1>")
-            
-            ,
-            
 
-            #-----------------input----------------#
-            #-------raw_counts_matrix_Preview------#
-            #--------------------------------------#
-            # A preview settings select option to change size of the displayed
-            # raw_counts matrix returned from the Set Clean Counts function.
-            #                       Object Name      
-            FilePreviewSize("raw_counts_matrix_Preview", 
-            #                       Widget Message                
-                            "Counts Matrix Preview")
-            
-            ,
-
-            #-----------------input----------------#
-            #--------geneID_geneName_Preview-------#
-            #--------------------------------------#
-            # A preview settings select option to change the size of the displayed
-            # dataframe containing gene ids and matching gene names
-            #                       Object Name      
-            FilePreviewSize("geneID_geneName_Preview", 
-            #                       Widget Message                
-                            "Gene Data Preview")
-            
-            ,
             
             HTML("<h1>Upload Meta Data</h1>")
             
@@ -84,32 +57,23 @@ ui <- navbarPage("DESeq2",
             
             ,
             
-            HTML("<h4>Which Column are your conditions in?</h4>")
-            
-            ,
-            
-            #-----------------input----------------#
-            #--------condition_factor_column-------#
-            #--------------------------------------#
-            #An int input for which column of the metadata file has the conditions
-            numericInput("condition_factor_column", "Column #", min=1, value=0)
-            
-            ,
-            
-            #-----------------input----------------#
-            #-----------submit_meta_data-----------#
-            #--------------------------------------#
-            #A Submit button to confirm the meta data and condition column
-            actionButton("submit_meta_data", "Confirm file and column")
-          
           ), ##XX##~~~Side Panel End~~~##XX##
           
 #_____________________________Main Panel________________________________#
           
           mainPanel(
             
+            HTML("<h1>Raw Counts Table</h1>"),
+            HTML("<p1>Upload your salmon merged counts matrix on the left. Your 
+                 uploaded file must be a .tsv file. Below you can explore and search
+                 through your unfiltered data once uploaded.")
+            
+            ,
+            
+            
             #Text output for error 1.0
-            textOutput('errorMessagesPG1.0')
+            #Error: Raw Counts upload must be .tsv file
+            uiOutput('errorMessagesPG1.0')
             
             ,
             
@@ -126,37 +90,30 @@ ui <- navbarPage("DESeq2",
             DTOutput('raw_counts_PreviewTable')
             
             ,
-
-            #----------------output----------------#
-            #-----geneID_geneName_PreviewTable-----#
-            #--------------------------------------#
-            #A Data Table preview of all gene ids and their gene names
-              #Expected Format:
-                #axis.names|    gene    | gene_name
-                #   1      | Gene_ID_1  |   Actin    
-                #   2      | Gene_ID_2  |   COOR4_7    
-            DTOutput('geneID_geneName_PreviewTable')
-
+            
+            HTML("<h1>Conditions (meta data) Table</h1>"),
+            HTML("<p1>Upload a .csv file with the samples in column 1 and their 
+                 conditions in column 2.")
+            
             ,
             
             #Text output for error 1.1
-            textOutput('errorMessagesPG1.1')
+            #Error: Meta Data Table upload expected a .csv file
+            uiOutput('errorMessagesPG1.1')
             
             ,
             
             #Text output for error 1.2
-            textOutput('errorMessagesPG1.2')
+            #"Error: Incorrect .csv format
+            uiOutput('errorMessagesPG1.2')
+            
+            ,
             
             #----------------output----------------#
             #----sample_conditions_PreviewTable----#
             #--------------------------------------#
             #A Data Table Preview of the samples and their respective conditions
-              #Expected Format:
-              # #axis.names|  Condition    
-              #   T0.s1    |  T0  
-              #   T96.s2   |  T96 
-            #Condition column stored as a factored category.
-            #TO-DO
+            tableOutput('sample_conditions_PreviewTable')
             
           )##XX##~~~Main Panel End~~~##XX##
           

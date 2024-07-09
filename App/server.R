@@ -30,58 +30,54 @@ server <- function(input, output) {
       #Expect as return c(raw_counts, gene_names)           
       func_return <- Set_Clean_Counts(input$merged_gene_counts_uploaded_file$datapath)
       
+      #Error PG1.0
       if(length(func_return) == 1){
-        output$errorMessagesPG1.0 <- renderText({
-          func_return
+        output$errorMessagesPG1.0 <- renderUI({
+          tags$p(style = "color: red;","Error: Raw Counts upload must be .tsv file")
         })
-      }else{
-        
-        output$errorMessagesPG1.0 <- NULL
-        
-        raw_counts(data.frame(func_return[1]))
-        
-        gene_names(data.frame(func_return[2]))
-        
-      }
+        return()
+      }else{output$errorMessagesPG1.0 <- NULL}
+      
+      raw_counts(data.frame(func_return[1]))
+      
+      gene_names(data.frame(func_return[2]))
+      
     }             
   )
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-----Observe UI Event------# ----> meta_data_conditions_uploaded_file
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  observeEvent(input$submit_meta_data,
+  observeEvent(input$meta_data_conditions_uploaded_file,
     {
       
-      #Goal: Take in a csv meta data file and a given column that contains conditions 
-      #for the samples in the same order as the colnames of the other dataframe. 
-      #Asking for the column with the condition helps deal with some variability 
-      #in how people label their samples in the csv before using the app.
       req(input$meta_data_conditions_uploaded_file)
-      req(input$merged_gene_counts_uploaded_file)
       
       metaDataFilePath  <- input$meta_data_conditions_uploaded_file$datapath
       
-      if( !grepl('.csv',metaDataFilePath , fixed=TRUE)){
-        output$errorMessagesPG1.1 <- renderText({
-          "Error: Meta Data Table upload expected a .csv file"
+      #Error PG1.1
+      if( !grepl('.csv',metaDataFilePath , fixed=TRUE) ){
+        output$errorMessagesPG1.1 <- renderUI({
+          tags$p(style = "color: red;","Error: Meta Data Table upload expected a .csv file")
         })
         return()
       }else{output$errorMessagesPG1.1 <- NULL}
       
       md <- read.csv(metaDataFilePath)
-  
-      if(input$condition_factor_column > ncol(md) | input$condition_factor_column == 0 ){
-        output$errorMessagesPG1.2 <- renderText({
-          "Error: Not a valid column for the Meta Data .csv file"
+      
+      #Error PG1.2
+      if( ncol(md) != 2 ){
+        output$errorMessagesPG1.2 <- renderUI({
+          tags$p(style = "color: red;","Error: Incorrect .csv format")
         })
         return()
-      }else{output$errorMessagesPG1.2 <- NULL}
+      }else(output$errorMessagesPG1.2 <- NULL)
       
-      cond <- factor(md[,input$condition_factor_column])
+      cond <- factor(md[,2])
       
       coldata <- data.frame(cond)
       
-      rownames(coldata) <- colnames(raw_counts())
+      rownames(coldata) <- md[,1]
       
       metaData(coldata)
     }
@@ -125,46 +121,44 @@ server <- function(input, output) {
     #Gene_ID_2 |    x      |    x    |    x
   output$raw_counts_PreviewTable <- renderDT(
     {
-    req(input$merged_gene_counts_uploaded_file)
-    req(input$raw_counts_matrix_Preview)
-    
-    #                       subject         setting
-    df <- makePreviewTable(raw_counts(),input$raw_counts_matrix_Preview)
-    
-    if(is.null(df)){
-      #Nothing is displayed if the preview table function comes back empty
-    }else{
-      df$gene <- row.names(df)
       
-      #Some editing to display the gene names as well
-      df <- left_join(df, gene_names())
-      
-      df <-df %>% tibble::column_to_rownames('gene')
-      
-      data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
-      
-      }
-    
-    }, rownames = TRUE, caption= "Raw Counts"
-  )
-
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #------geneID_geneName_PreviewTable------#
-  #~~~~~~~~~~~~~~Data Table~~~~~~~~~~~~~~~~#
-  #A Data Table preview of all gene ids and their gene names
-    #Expected Format:
-    #axis.names|    gene    | gene_name
-    #   1      | Gene_ID_1  |   Actin    
-    #   2      | Gene_ID_2  |   COOR4_7    
-  output$geneID_geneName_PreviewTable <- renderDT(
-    {
       req(input$merged_gene_counts_uploaded_file)
-      req(input$geneID_geneName_Preview)
       
-      #                 subject
-      makePreviewTable(gene_names(),input$geneID_geneName_Preview)
+      df <- raw_counts()
       
-    }, rownames = TRUE, caption= "Gene IDs & Gene name"
+      if(!is.null(df)){
+        
+        df$gene <- row.names(df)
+        
+        #Some editing to display the gene names as well
+        df <- left_join(df, gene_names())
+        
+        df <-df %>% tibble::column_to_rownames('gene')
+        
+        data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
+        
+      }
+      
+    }, rownames = TRUE, options = list(pageLength=5)
+  )
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #--------sample_conditions_Preview-------#
+  #~~~~~~~~~~~~~~~~~Table~~~~~~~~~~~~~~~~~~#
+  #A Data Table preview of what is inside the uploaded counts table 
+  #after formating correctly
+  #Expected Format:
+  #axis.names| Gene Name | Sample1 | Sample 2 
+  #Gene_ID_1 |    x      |    x    |    x
+  #Gene_ID_2 |    x      |    x    |    x
+  output$sample_conditions_PreviewTable <- renderTable(
+    {
+      if(!is.null(metaData())){
+        
+        t(metaData())
+        
+      }
+    }
   )
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#

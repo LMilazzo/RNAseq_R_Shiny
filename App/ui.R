@@ -7,6 +7,7 @@ library(dplyr)
 library(readr)
 source("Functions.R")
 library(crayon)
+library(DESeq2)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -36,7 +37,7 @@ ui <- navbarPage("DESeq2",
             #--------------------------------------#
             # An upload file widget for the merged gene counts tsv,csv
             #          Object Name    
-            FileUpload("merged_gene_counts_uploaded_file", 
+            fileInput("merged_gene_counts_uploaded_file", 
             #          Widget Message 
                        "Salmon Merged Counts .tsv file")
             
@@ -52,11 +53,11 @@ ui <- navbarPage("DESeq2",
             #--------------------------------------#
             # An upload file widget for the metadata .csv file
             #          Object Name    
-            FileUpload("meta_data_conditions_uploaded_file", 
-                       #          Widget Message 
+            fileInput("meta_data_conditions_uploaded_file", 
+                       #  Widget Message 
                        "Conditions")
             
-            ,
+            
             
           ), ##XX##~~~Side Panel End~~~##XX##
           
@@ -132,34 +133,16 @@ ui <- navbarPage("DESeq2",
 #-----------------------Expected output Count: 2------------------------#
 #-----------------------Possible Errors Count: 0------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    tabPanel("DESeq2 and Filtering Info",
+    tabPanel("DataSet info",
       fluidPage(
             
-            HTML("<h2>Filter Notes</h2>")
-        
-            ,
             #----------------output----------------#
-            #---------------nFiltered--------------#
+            #---------------dataInfo--------------#
             #--------------------------------------#
-            #A message stating how many rows were filtered
-            textOutput('nFiltered')
+            #Basic Information About the dataset
+            uiOutput('dataInfo')
 
-            ,
-
-            nFiltered
             
-            ,
-            
-            #----------------output----------------#
-            #-----filtered_counts_PreviewTable-----#
-            #--------------------------------------#
-            #A Data Table preview of what is inside the filtered counts matrix 
-            #after filtering correctly
-              #Expected Format:
-              #axis.names| geneName| Sample 2 | Sample 3
-              #Gene_ID_1 |    x    |    x     |    x
-              #Gene_ID_2 |    x    |    x     |    x
-            #DTOutput('filtered_counts_PreviewTable')
             
       ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
     ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##

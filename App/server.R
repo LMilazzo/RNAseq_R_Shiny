@@ -8,8 +8,8 @@ server <- function(input, output) {
   raw_counts <- reactiveVal(NULL)
   gene_names <- reactiveVal(NULL)
   filtered_counts <- reactiveVal(NULL)
-  nFiltered <- reactiveVal(0)
   metaData <- reactiveVal(NULL)
+  ddsc <- reactiveVal(NULL)
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -93,12 +93,46 @@ server <- function(input, output) {
       
       func_return <- filterCounts(raw_counts())
       
-      filtered_counts(data.frame(func_return[1]))
-      
-      nFiltered(func_return[2])
-      
+      filtered_counts(data.frame(func_return))
     }
   )
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #---Observe Value Event-----# ----> raw_counts & metaData -> ddsc
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  observeEvent(c(filtered_counts(), metaData()),
+    {
+      print("trigger")
+      if(is.null(filtered_counts())){return()}
+      if(is.null(metaData())){return()}
+      print("will run")
+      
+      datamatrix <- as.matrix(filtered_counts())
+      
+      coldata <- metaData()
+      
+      cond <- factor(metaData()[,1])
+      
+      print(head(datamatrix))
+      print(coldata)
+      print(cond)
+      
+      d <- DESeqDataSetFromMatrix(countData = datamatrix, 
+                                     colData = coldata, 
+                                     design = ~ cond)
+      
+      showModal(modalDialog("Running DESeq...", footer=NULL))
+      
+      ddsc(DESeq(d))
+      
+      showModal(modalDialog("Done!!", easyClose=TRUE, footer=NULL))
+      
+      Sys.sleep(1)
+      
+      removeModal()
+    }
+  )
+
  
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
@@ -145,12 +179,6 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #--------sample_conditions_Preview-------#
   #~~~~~~~~~~~~~~~~~Table~~~~~~~~~~~~~~~~~~#
-  #A Data Table preview of what is inside the uploaded counts table 
-  #after formating correctly
-  #Expected Format:
-  #axis.names| Gene Name | Sample1 | Sample 2 
-  #Gene_ID_1 |    x      |    x    |    x
-  #Gene_ID_2 |    x      |    x    |    x
   output$sample_conditions_PreviewTable <- renderTable(
     {
       if(!is.null(metaData())){
@@ -161,46 +189,42 @@ server <- function(input, output) {
     }
   )
   
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #-------filtered_counts_PreviewTable-----#
-  #~~~~~~~~~~~~~~Data Table~~~~~~~~~~~~~~~~#
-  #A Data Table preview of what is inside the uploaded counts table 
-  #after filtering correctly for low count genes
-    #Expected Format:
-    #axis.names| Gene Name | Sample1 | Sample 2 
-    #Gene_ID_1 |    x      |    x    |    x
-    #Gene_ID_2 |    x      |    x    |    x
-  output$filtered_counts_PreviewTable <- renderDT(
-    {
-      req(!is.null(filtered_counts))
-      
-      #                       subject   setting
-      df <- makePreviewTable(filtered_counts(),"Full")
-      
-      if(is.null(df)){
-        #Nothing is displayed if the preview table function comes back empty
-      }else{
-        df$gene <- row.names(df)
-        
-        #Some editing to display the gene names as well
-        df <- left_join(df, gene_names())
-        
-        df <-df %>% tibble::column_to_rownames('gene')
-        
-        data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
-      }
-      
-    }
-  )
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #----------------nFiltered---------------#
   #~~~~~~~~~~~~~~~~Text Value~~~~~~~~~~~~~~#
   #The number of row filtered from filterCounts
-  output$nFiltered <- renderText(
+  output$dataInfo <- renderUI(
     {
-      message <- paste("There were ", nFiltered(), "rows/genes omited due to row sums < 10")
-      message
+      
+      if(is.null(raw_counts())){
+        return(tags$p(style = "color: red;","Upload Data"))
+      }
+      
+      r <- raw_counts()
+      f <- filtered_counts()
+      diff <- nrow(r) - nrow(f)
+      #diff <- tags$p(style = "color: red; margin: 0; padding: 0;",diff)
+      
+      Top5RowSum <- head(r[order(-rowSums(r)),], 5)
+      Top5RowSum$gene <- row.names(Top5RowSum)
+      Top5RowSum <- left_join(Top5RowSum, gene_names())
+      Top5RowSum <- Top5RowSum %>% tibble::column_to_rownames('gene_name')
+      Top5RowSum <- datatable(Top5RowSum[,1:ncol(Top5RowSum)-1], options=list(pageLength=5, dom="t"))
+      
+      div(
+        
+        h1("Data Set Info"),
+        
+        h3("# Rows Filtered"),
+        
+        p(span(diff, style="color: red;"), " rows were removed from the data set with row sums < 10"),
+        
+        h3("Top 5 Genes by Row Sum"),
+        
+        Top5RowSum
+        
+        )
     }
   )
   

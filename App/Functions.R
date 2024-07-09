@@ -6,34 +6,6 @@ library(dplyr)
 #~~~~~######_______________UI Functions_______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#-------File Upload--------#
-#~~~~~~~~~~Widget~~~~~~~~~~#
-# Creates a widget for a file upload
-# @param Identifing name for the uploaded file
-# @param statement to be displayed near the widget
-FileUpload <- function(widget_Identfier, widget_Statement){
-  
-  fileInput(widget_Identfier, widget_Statement)
-  
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#-------File Preview-------#
-#~~~~~~~~~~Widget~~~~~~~~~~#
-# Creates a widget for a selecting what preview style should appear 
-# @param Identifing name for the preview type describing which object it belongs to
-# @param statement to be displayed near the widget
-FilePreviewSize <- function(widget_Identfier, widget_Statement){
-  
-  #Options <- A vector of character choices defining the display types
-  options <- c("None", "Head", "Full")
-  
-  selectInput(widget_Identfier, widget_Statement, options)
-  
-}
-
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_____________Server Functions_____________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -79,30 +51,6 @@ Set_Clean_Counts <- function(raw_counts_table){
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#----Make Preview Table----#
-#~~~~~~~~~~~Func~~~~~~~~~~~#
-#based on the table and view settings returns the right rows/columns to turn
-#into a data table
-#@param the data frame or matrix to view
-#@param the view setting
-makePreviewTable <- function(subject, setting){
-  if(setting == "Full"){
-    subject
-  }
-  else if(setting == "Head"){
-    head(subject)
-  }
-  else if(setting == "Column Names"){
-    colnames(subject)
-  }
-  else if(setting == "Row Names"){
-    rownames(subject)
-  }
-  else{
-  }
-}
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------Filter Counts------#
 #~~~~~~~~~~~Func~~~~~~~~~~~#
 #Takes raw_counts as input and returns a filtered version that removes low 
@@ -114,8 +62,6 @@ filterCounts <- function(counts){
 
   fcounts <- counts
   
-  Srows <- nrow(fcounts)
-  
   keep <- rowSums(fcounts) > 10
   
   fcounts <- fcounts[keep,]
@@ -124,10 +70,6 @@ filterCounts <- function(counts){
   
   fcounts <- as.matrix(fcounts)
   
-  Erows <- nrow(fcounts)
-  
-  nFiltered <- Srows - Erows
-  
-  return( list(fcounts, nFiltered))
+  return(fcounts)
 }
 

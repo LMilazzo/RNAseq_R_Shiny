@@ -36,10 +36,15 @@ Set_Clean_Counts <- function(raw_counts_table){
   
   count <- read.csv(raw_counts_table, sep="\t")
 
+  if(!'gene_id' %in% colnames(count) || !'gene_name' %in% colnames(count)){
+    return("Bad .tsv")
+  }
+
   gene_names <- count %>% 
                 select(gene_name , gene_id) %>%
                 mutate(gene = gene_id) %>%
                 select(-gene_id)
+  
   
   count <- count %>% select(-gene_name)
   

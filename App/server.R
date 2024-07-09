@@ -33,7 +33,7 @@ server <- function(input, output) {
       #Error PG1.0
       if(length(func_return) == 1){
         output$errorMessagesPG1.0 <- renderUI({
-          tags$p(style = "color: red;","Error: Raw Counts upload must be .tsv file")
+          tags$p(style = "color: red;","Error: Raw Counts upload must be valid .tsv counts file")
         })
         return()
       }else{output$errorMessagesPG1.0 <- NULL}
@@ -103,10 +103,8 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   observeEvent(c(filtered_counts(), metaData()),
     {
-      print("trigger")
-      if(is.null(filtered_counts() || nrow(filtered_counts() <= 0))){return()}
+      if(is.null(filtered_counts()) || nrow(filtered_counts()) <= 0 ){return()}
       if(is.null(metaData())){return()}
-      print("will run")
       
       datamatrix <- as.matrix(filtered_counts())
       
@@ -189,7 +187,6 @@ server <- function(input, output) {
       }
     }
   )
-  
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #----------------nFiltered---------------#

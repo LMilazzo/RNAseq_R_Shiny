@@ -92,8 +92,9 @@ server <- function(input, output) {
       if(is.null(raw_counts())){return()}
       
       func_return <- filterCounts(raw_counts())
-      
+
       filtered_counts(data.frame(func_return))
+    
     }
   )
   
@@ -103,7 +104,7 @@ server <- function(input, output) {
   observeEvent(c(filtered_counts(), metaData()),
     {
       print("trigger")
-      if(is.null(filtered_counts())){return()}
+      if(is.null(filtered_counts() || nrow(filtered_counts() <= 0))){return()}
       if(is.null(metaData())){return()}
       print("will run")
       

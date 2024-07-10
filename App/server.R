@@ -10,6 +10,9 @@ server <- function(input, output) {
   filtered_counts <- reactiveVal(NULL)
   metaData <- reactiveVal(NULL)
   ddsc <- reactiveVal(NULL)
+  upReg <- reactiveVal(NULL)
+  downReg <- reactiveVal(NULL)
+  noReg <- reactiveVal(NULL)
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -110,11 +113,8 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   observeEvent(c(filtered_counts(), metaData()),
     {
-      print("trigger")
       if(is.null(filtered_counts()) || nrow(filtered_counts()) <= 0 ){return()}
-      print("half req")
       if(is.null(metaData())){return()}
-      print("will run")
       
       datamatrix <- as.matrix(filtered_counts())
       
@@ -139,6 +139,15 @@ server <- function(input, output) {
       Sys.sleep(1)
       
       removeModal()
+      
+      regulationCutOff <- 0.5
+      
+      res <- results(ddsc())
+      up <- as.data.frame(res)
+      up <- up %>% filter(log2FoldChange > regulationCutOff)
+      up <- up[order(up$padj),]
+      print(head(up))
+      
     }
   )
 

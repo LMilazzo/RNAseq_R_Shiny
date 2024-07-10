@@ -12,7 +12,7 @@ library(DESeq2)
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
 ui <- navbarPage("DESeq2",  
-   theme = shinytheme("sandstone"),
+   theme = shinytheme("cyborg"),
    
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 1----------------------------------#
@@ -129,12 +129,30 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 2----------------------------------#
 #-----------------------------DESeq2 Info-------------------------------#
-#---------------------------Widget Count: 0-----------------------------#
-#-----------------------Expected output Count: 0------------------------#
+#---------------------------Widget Count: 1-----------------------------#
+#-----------------------Expected output Count: 1------------------------#
 #-----------------------Possible Errors Count: 0------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     tabPanel("DEG Analysis",
       fluidPage(
+        
+        #-----------------input----------------#
+        #----------------pvalue----------------#
+        #--------------------------------------#
+        # A select input giving the choice to change the displayed genes off pvalue
+        # not just resort lists but actually dislpay more or less genes
+        selectInput("pvalue", "Select adjusted P value cutoff for following tables", 
+                    choices=c(1.0 ,0.5, 0.05, 0.01, 0.001))
+        
+        ,
+        
+        #----------------output----------------#
+        #---DESeq_Expression_Analysis_Tables---#
+        #--------------------------------------#
+        #A single Div containing three tables one for up-regulated, down-reg, 
+        #and no regulated genes
+        uiOutput('DESeq_Expression_Analysis_Tables')
+        
         
       ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
     ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##

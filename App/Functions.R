@@ -78,3 +78,37 @@ filterCounts <- function(counts){
   return(fcounts)
 }
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------Split by Expr------#
+#~~~~~~~~~~~Func~~~~~~~~~~~#
+#Splits the results by expression level orders by P val
+#@param the data from the results
+#@param the list of geneids and gene names
+#@return a list of the three new dataframes
+splitByExpr <- function(data, gene_names){
+  
+  regulationCutOff <- 0.5
+  
+  data$gene <- row.names(data)
+  
+  data <- left_join(data, gene_names) %>% select(-gene)
+  
+  colOrder <- c('gene_name', 'baseMean', 'log2FoldChange', 'lfcSE', 'stat', 'pvalue', 'padj')
+  
+  data <- data[,colOrder]
+  
+  res <- data.frame(data)
+  
+  up <- res %>% filter(log2FoldChange > regulationCutOff)
+  up <- up[order(up$padj),]
+  
+  down <- res %>% filter(log2FoldChange < -regulationCutOff)
+  down <- down[order(down$padj),]
+  
+  noR <- res %>% filter(log2FoldChange > -regulationCutOff) %>% filter(log2FoldChange < regulationCutOff)
+  noR <- noR[order(noR$padj),]
+  
+  return(list(up, down, noR))
+  
+}

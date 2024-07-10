@@ -10,9 +10,10 @@ server <- function(input, output) {
   filtered_counts <- reactiveVal(NULL)
   metaData <- reactiveVal(NULL)
   ddsc <- reactiveVal(NULL)
-  upReg <- reactiveVal(NULL)
-  downReg <- reactiveVal(NULL)
-  noReg <- reactiveVal(NULL)
+  up <- reactiveVal(NULL)
+  down <- reactiveVal(NULL)
+  noR <- reactiveVal(NULL)
+  
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -109,8 +110,8 @@ server <- function(input, output) {
   )
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #---Observe Value Event-----# ----> raw_counts & metaData -> ddsc
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #---Observe Value Event-----# ----> raw_counts & metaData 
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  Performs DESeq 
   observeEvent(c(filtered_counts(), metaData()),
     {
       if(is.null(filtered_counts()) || nrow(filtered_counts()) <= 0 ){return()}
@@ -140,18 +141,14 @@ server <- function(input, output) {
       
       removeModal()
       
-      regulationCutOff <- 0.5
+      func_return <- splitByExpr( data.frame(results(ddsc())), gene_names() )
       
-      res <- results(ddsc())
-      up <- as.data.frame(res)
-      up <- up %>% filter(log2FoldChange > regulationCutOff)
-      up <- up[order(up$padj),]
-      print(head(up))
-      
+      up(data.frame(func_return[1]))
+      down(data.frame(func_return[2]))
+      noR(data.frame(func_return[3]))
     }
   )
-
- 
+  
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -207,5 +204,47 @@ server <- function(input, output) {
     }
   )
   
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #-----DESeq_Expression_Analysis_Tables---#
+  #~~~~~~~~~~~~~~~~~HTML UI~~~~~~~~~~~~~~~~#
+  output$DESeq_Expression_Analysis_Tables <- renderUI(
+    {
+      
+      return_ui <- NULL
+      
+      if(is.null(up())){
+        return_ui <- h1(span("No Data Yet",style="color: red;"))
+        return_ui
+      }else
+      if(is.null(down())){
+        return_ui <- h1(span("No Data Yet",style="color: red;"))
+        return_ui
+      }else
+      if(is.null(noR())){
+        return_ui <- h1(span("No Data Yet",style="color: red;"))
+        return_ui
+      }else{
+
+        div(
+          
+          div(h1("Up Regulated Genes: ",  nrow(up() %>% filter(padj < as.numeric(input$pvalue) ) ) )), 
+          
+          datatable(up() %>% filter(padj < as.numeric(input$pvalue) ), rownames=FALSE, option=list(pageLength=7)),
+          
+          div(h1("Down Regulated Genes: ", nrow(down() %>% filter(padj < as.numeric(input$pvalue) ) ) )),
+          
+          datatable(down()%>% filter(padj < as.numeric(input$pvalue) ), rownames=FALSE, option=list(pageLength=7)),
+          
+          div(h1("Genes with low diffrential expression: ", nrow(noR() %>% filter(padj < as.numeric(input$pvalue) ) ) )),
+          
+          datatable(noR()  %>% filter(padj < as.numeric(input$pvalue) ), rownames=FALSE, option=list(pageLength=7))
+        )
+      
+      }
+      
+      
+      
+    }
+  )
 }#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
 

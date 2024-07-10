@@ -94,7 +94,14 @@ server <- function(input, output) {
       func_return <- filterCounts(raw_counts())
 
       filtered_counts(data.frame(func_return))
+
+      r <- raw_counts()
+      f <- filtered_counts()
+      diff <- nrow(r) - nrow(f)
+
+      message <- div(p(span(diff, style="color: red;"), " rows were removed from the data set with row sums < 10"))
     
+      showModal(modalDialog(message))
     }
   )
   
@@ -188,45 +195,6 @@ server <- function(input, output) {
         t(metaData())
         
       }
-    }
-  )
-  
-  
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #----------------nFiltered---------------#
-  #~~~~~~~~~~~~~~~~Text Value~~~~~~~~~~~~~~#
-  #The number of row filtered from filterCounts
-  output$dataInfo <- renderUI(
-    {
-      
-      if(is.null(raw_counts())){
-        return(tags$p(style = "color: red;","Upload Data"))
-      }
-      
-      r <- raw_counts()
-      f <- filtered_counts()
-      diff <- nrow(r) - nrow(f)
-      #diff <- tags$p(style = "color: red; margin: 0; padding: 0;",diff)
-      
-      Top5RowSum <- head(r[order(-rowSums(r)),], 5)
-      Top5RowSum$gene <- row.names(Top5RowSum)
-      Top5RowSum <- left_join(Top5RowSum, gene_names())
-      Top5RowSum <- Top5RowSum %>% tibble::column_to_rownames('gene_name')
-      Top5RowSum <- datatable(Top5RowSum[,1:ncol(Top5RowSum)-1], options=list(pageLength=5, dom="t"))
-      
-      div(
-        
-        h1("Data Set Info"),
-        
-        h3("# Rows Filtered"),
-        
-        p(span(diff, style="color: red;"), " rows were removed from the data set with row sums < 10"),
-        
-        h3("Top 5 Genes by Row Sum"),
-        
-        Top5RowSum
-        
-        )
     }
   )
   

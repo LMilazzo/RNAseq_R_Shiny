@@ -30,11 +30,15 @@ library(dplyr)
 # @return gene_names data frame
 Set_Clean_Counts <- function(raw_counts_table){
   
-  if( !grepl('.tsv', raw_counts_table, fixed=TRUE)){
-      return("Not .tsv")
+  if( !grepl('.tsv', raw_counts_table, fixed=TRUE) && !grepl('.csv', raw_counts_table, fixed=TRUE)){
+      return("Error")
   }
   
-  count <- read.csv(raw_counts_table, sep="\t")
+  if(grepl('.tsv', raw_counts_table, fixed=TRUE)){
+    count <- read.csv(raw_counts_table, sep="\t")
+  }else{
+    count <- read.csv(raw_counts_table)
+  }
 
   if(!'gene_id' %in% colnames(count) || !'gene_name' %in% colnames(count)){
     return("Bad .tsv")
@@ -86,13 +90,15 @@ filterCounts <- function(counts){
 #@param the data from the results
 #@param the list of geneids and gene names
 #@return a list of the three new dataframes
-splitByExpr <- function(data, gene_names){
+splitByExpr <- function(data, gene_names, cut){
   
-  regulationCutOff <- 0.5
+  lowerBound <- cut[1]
+  upperBound <- cut[2]
   
   data$gene <- row.names(data)
   
   data <- left_join(data, gene_names) %>% select(-gene)
+  
   
   colOrder <- c('gene_name', 'baseMean', 'log2FoldChange', 'lfcSE', 'stat', 'pvalue', 'padj')
   
@@ -100,13 +106,13 @@ splitByExpr <- function(data, gene_names){
   
   res <- data.frame(data)
   
-  up <- res %>% filter(log2FoldChange > regulationCutOff)
+  up <- res %>% filter(log2FoldChange > upperBound)
   up <- up[order(up$padj),]
   
-  down <- res %>% filter(log2FoldChange < -regulationCutOff)
+  down <- res %>% filter(log2FoldChange < lowerBound)
   down <- down[order(down$padj),]
   
-  noR <- res %>% filter(log2FoldChange > -regulationCutOff) %>% filter(log2FoldChange < regulationCutOff)
+  noR <- res %>% filter(log2FoldChange > lowerBound) %>% filter(log2FoldChange < upperBound)
   noR <- noR[order(noR$padj),]
   
   return(list(up, down, noR))

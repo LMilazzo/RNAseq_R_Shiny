@@ -28,7 +28,12 @@ ui <- navbarPage("DESeq2",
           
           sidebarPanel(
             
-            HTML("<h1>Upload Data</h1>")
+            HTML("<p>(Optional If you still need to run the DEG process for your data)</p>"),
+            HTML("<p>If you already have this done and a file with data skip this page</p>")
+            
+            ,
+            
+            HTML("<h2>Upload Data</h1>")
             
             ,
             
@@ -39,12 +44,16 @@ ui <- navbarPage("DESeq2",
             #          Object Name    
             fileInput("merged_gene_counts_uploaded_file", 
             #          Widget Message 
-                       "Salmon Merged Counts .tsv file")
+                       "Salmon Merged Counts .tsv/.csv file")
             
             ,
-
+           
+            HTML("<p>(Not Optional)</p>"),
+            HTML("<p>Meta Data and conditions is needed for analysis</p>")
             
-            HTML("<h1>Upload Meta Data</h1>")
+            ,
+            
+            HTML("<h2>Upload Meta Data</h1>")
             
             ,
             
@@ -57,6 +66,14 @@ ui <- navbarPage("DESeq2",
                        #  Widget Message 
                        "Conditions")
             
+            ,
+            
+            #-----------------input----------------#
+            #---------------run_DESeq2-------------#
+            #--------------------------------------#
+            # Action button that starts DSeq2 disabling the upload of
+            # a more advanced dataset
+            actionButton("run_DESeq2", "Run Differential Expression")
             
             
           ), ##XX##~~~Side Panel End~~~##XX##
@@ -71,14 +88,6 @@ ui <- navbarPage("DESeq2",
                  through your unfiltered data once uploaded.")
             
             ,
-            
-            
-            #Text output for error 1.0
-            #Error: Raw Counts upload must be .tsv file
-            uiOutput('errorMessagesPG1.0')
-            
-            ,
-            
             
             #----------------output----------------#
             #--------raw_counts_PreviewTable-------#
@@ -96,18 +105,6 @@ ui <- navbarPage("DESeq2",
             HTML("<h1>Conditions (meta data) Table</h1>"),
             HTML("<p1>Upload a .csv file with the samples in column 1 and their 
                  conditions in column 2.")
-            
-            ,
-            
-            #Text output for error 1.1
-            #Error: Meta Data Table upload expected a .csv file
-            uiOutput('errorMessagesPG1.1')
-            
-            ,
-            
-            #Text output for error 1.2
-            #"Error: Incorrect .csv format
-            uiOutput('errorMessagesPG1.2')
             
             ,
             
@@ -135,28 +132,56 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     tabPanel("DEG Analysis",
       fluidPage(
+        sidebarLayout(
+#______________________________Side Bar_________________________________#
         
-        #-----------------input----------------#
-        #----------------pvalue----------------#
-        #--------------------------------------#
-        # A select input giving the choice to change the displayed genes off pvalue
-        # not just resort lists but actually dislpay more or less genes
-        selectInput("pvalue", "Select adjusted P value cutoff for following tables", 
-                    choices=c(1.0 ,0.5, 0.05, 0.01, 0.001))
-        
-        ,
-        
-        #----------------output----------------#
-        #---DESeq_Expression_Analysis_Tables---#
-        #--------------------------------------#
-        #A single Div containing three tables one for up-regulated, down-reg, 
-        #and no regulated genes
-        uiOutput('DESeq_Expression_Analysis_Tables')
-        
-        
+          sidebarPanel(
+            
+            #-----------------input----------------#
+            #----------DEG_analysis_data-----------#
+            #--------------------------------------#
+            # An upload file widget for the DEG data
+            # If the raw counts and metadata were uploaded to perform DESeq2
+            # This will not be visable
+            uiOutput('pg2_display_upload_DEG_data')
+            
+            ,
+            
+            #-----------------input----------------#
+            #----------------pvalue----------------#
+            #--------------------------------------#
+            # A select input giving the choice to change the displayed genes off pvalue
+            # not just resort lists but actually display more or less genes
+            selectInput("pvalue", "Select adjusted P value cutoff for following tables", 
+                        choices=c(1.0 ,0.5, 0.05, 0.01, 0.001))
+            
+            
+          ), ##XX##~~~Side Panel End~~~##XX##
+          
+#_____________________________Main Panel________________________________#
+
+          mainPanel(      
+            
+            #-----------------input----------------#
+            #----------------cutOffs----------------#
+            #--------------------------------------#
+            # A slider to adjust what cutoffs will be shown for the tables
+            sliderInput('cutOffs', 'Cut-off values for the genes being displayed as a certain direction of diffrential expression', min=-12, max=12, step=0.10, value = c(-0.5, 0.5), width='100%')
+            
+            ,
+            
+            #----------------output----------------#
+            #---DESeq_Expression_Analysis_Tables---#
+            #--------------------------------------#
+            #A single Div containing three tables one for up-regulated, down-reg, 
+            #and no regulated genes
+            uiOutput('DESeq_Expression_Analysis_Tables')
+            
+          )##XX##~~~Main Panel End~~~##XX##
+
+        ) ##XX##~~~Side Bar Layout Closing Bracket~~~##XX##
       ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
     ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
-            
                  
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
    

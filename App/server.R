@@ -10,7 +10,8 @@ server <- function(input, output) {
   gene_names <- reactiveVal(NULL)
   filtered_counts <- reactiveVal(NULL)
   metaData <- reactiveVal(NULL)
-  ddsc <- reactiveVal(NULL)
+  ddsc <- reactiveVal(NULL) #The Object
+  results_ddsc <- reactiveVal(NULL) #Just a dataframe of results
   up <- reactiveVal(NULL)
   down <- reactiveVal(NULL)
   noR <- reactiveVal(NULL)
@@ -173,6 +174,7 @@ server <- function(input, output) {
         showModal(modalDialog("Running DESeq...", footer=NULL))
         
         ddsc(DESeq(d))
+        results_ddsc(data.frame(results(ddsc())))
         
         showModal(modalDialog("Done!!", easyClose=TRUE, footer=NULL))
         
@@ -253,6 +255,7 @@ server <- function(input, output) {
      deg <- deg %>% tibble::column_to_rownames('gene')
      
      ddsc(deg)
+     results_ddsc(deg)
      
      stuff <- data.frame(data[,9:ncol(data)])
      stuff <- stuff %>% mutate(gene = gene_names()$gene)
@@ -265,26 +268,18 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #---Observe Value Event-----# ----> ddsc()
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  splits set by given cutoff values
-  observeEvent(list(ddsc(),input$cutOffs),
+  observeEvent(list(results_ddsc(),input$cutOffs),
    {
      
-     if(is.null(ddsc())){
+     if(is.null(results_ddsc())){
        return()
      }
-     if(is.data.frame(ddsc())){
-       func_return <- splitByExpr(data.frame(ddsc()), gene_names(), input$cutOffs )
+     func_return <- splitByExpr(results_ddsc(), gene_names(), input$cutOffs )
 
-       up(data.frame(func_return[1]))
-       down(data.frame(func_return[2]))
-       noR(data.frame(func_return[3]))
-     }else{
-       
-       func_return <- splitByExpr( data.frame(results(ddsc())), gene_names(), input$cutOffs )
-       
-       up(data.frame(func_return[1]))
-       down(data.frame(func_return[2]))
-       noR(data.frame(func_return[3]))
-     }
+     up(data.frame(func_return[1]))
+     down(data.frame(func_return[2]))
+     noR(data.frame(func_return[3]))
+     
    }
   )
   
@@ -363,20 +358,31 @@ server <- function(input, output) {
         return_ui <- h1(span("No Data Yet",style="color: red;"))
         return_ui
       }else{
-
+      
+        p <- as.numeric(input$pvalue)
+        
+        t1 <- up() %>% select(input$display_col, 'padj')
+        t2 <- down() %>% select(input$display_col, 'padj')
+        t3 <- noR() %>% select(input$display_col, 'padj')
+        
+        
+        t1 <- t1 %>% filter(padj < as.numeric(input$pvalue))
+        t2 <- t2 %>% filter(padj < as.numeric(input$pvalue))
+        t3 <- t3 %>% filter(padj < as.numeric(input$pvalue))
+        
         div(
           
-          div(h1("Up Regulated Genes: ",  nrow(up() %>% filter(padj < as.numeric(input$pvalue) ) ) )), 
+          div(h2("Up Regulated Genes: ",  nrow(t1) )), 
           
-          datatable(up() %>% filter(padj < as.numeric(input$pvalue) ), rownames=FALSE, option=list(pageLength=7)),
+          datatable(t1, rownames=FALSE, option=list(pageLength=7)),
           
-          div(h1("Down Regulated Genes: ", nrow(down() %>% filter(padj < as.numeric(input$pvalue) ) ) )),
+          div(h2("Down Regulated Genes: ", nrow(t2) )),
           
-          datatable(down()%>% filter(padj < as.numeric(input$pvalue) ), rownames=FALSE, option=list(pageLength=7)),
+          datatable(t2, rownames=FALSE, option=list(pageLength=7)),
           
-          div(h1("Genes with low diffrential expression: ", nrow(noR() %>% filter(padj < as.numeric(input$pvalue) ) ) )),
+          div(h2("Genes Between Selected Cutoffs: ", nrow(t3) )),
           
-          datatable(noR()  %>% filter(padj < as.numeric(input$pvalue) ), rownames=FALSE, option=list(pageLength=7))
+          datatable(t3, rownames=FALSE, option=list(pageLength=7))
         )
       
       }
@@ -385,6 +391,49 @@ server <- function(input, output) {
       
     }
   )
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #--------DEG_Distribution_Histogram------#
+  #~~~~~~~~~~~~~~~~~Histogram~~~~~~~~~~~~~~#
+  output$DEG_Distribution_Histogram <- renderPlot(
+    {
+      if(is.null(results_ddsc())){return()}
+      data <- results_ddsc() %>% filter(padj < as.numeric(input$pvalue))
+      data <- data %>% select('log2FoldChange')
+      
+      ggplot(data, aes(x=data$log2FoldChange)) + 
+        geom_histogram(bins=50, fill='darkslategrey') + 
+        xlab("Log2 Fold Change") + 
+        ylab("") + 
+        theme_minimal() + 
+        theme(panel.grid.major.x = element_blank(), 
+              panel.grid.minor.y = element_blank(),
+              panel.grid.minor.x = element_blank(),
+              panel.grid.major.y = element_blank(),
+              x.axis.line = element_line(),
+              y.axis.line = element_blank(),
+              plot.margin = margin(75, 15, 0, -5, "pt"),
+              axis.text.x = element_text(color = "black", size = 15),
+              axis.title.x = element_text(size = 15),) 
+      
+    }
+  )
+  output$Distribution_Hitogram_ui <- renderUI(
+    {
+      if(is.null(results_ddsc())){return()}
+      
+      div(
+        
+        HTML("<h4>Distribution of Fold Change</h4>")
+        
+        ,
+        
+        plotOutput('DEG_Distribution_Histogram')
+      
+        )
+    }
+  )
+  
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-----pg2_display_upload_DEG_data--------#
@@ -403,5 +452,6 @@ server <- function(input, output) {
       }
     }
   )
+  
 }#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
 

@@ -8,6 +8,7 @@ library(readr)
 source("Functions.R")
 library(crayon)
 library(DESeq2)
+library(ggplot2)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -155,6 +156,20 @@ ui <- navbarPage("DESeq2",
             selectInput("pvalue", "Select adjusted P value cutoff for following tables", 
                         choices=c(1.0 ,0.5, 0.05, 0.01, 0.001))
             
+            ,
+            
+            checkboxGroupInput('display_col', 'Values of Interest (may take longer to load if more selected)', 
+                               c('Gene Name' = 'gene_name', 
+                               'Base Mean' = 'baseMean', 
+                               'Log2 Fold Change' ='log2FoldChange',
+                               'lfcSE' ='lfcSE',
+                               'Stat' ='stat',	
+                               'P-Value' ='pvalue'),
+                               selected=c('gene_name','log2FoldChange'),
+                               inline=FALSE)
+            ,
+            
+            uiOutput("Distribution_Hitogram_ui")
             
           ), ##XX##~~~Side Panel End~~~##XX##
           

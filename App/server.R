@@ -6,17 +6,23 @@ server <- function(input, output) {
 #~~~~~######_____________Reactive Values______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   run_question <- reactiveVal(NULL)
+  kill_deg <- reactiveVal(NULL)
+  
   raw_counts <- reactiveVal(NULL)
   gene_names <- reactiveVal(NULL)
   filtered_counts <- reactiveVal(NULL)
   metaData <- reactiveVal(NULL)
-  ddsc <- reactiveVal(NULL) #The Object
+  
+  ddsc <- reactiveVal(NULL) #The Object DESeq2 
   results_ddsc <- reactiveVal(NULL) #Just a dataframe of results
+  
+  #Lists of regulated genes -0.5, 0.5 FoldChange cut off
   up <- reactiveVal(NULL)
   down <- reactiveVal(NULL)
-  noR <- reactiveVal(NULL)
-  vst_counts <- reactiveVal(NULL)
+  noR <- reactiveVal(NULL) #No regulation
   
+  vst_counts_VST_OBJECT <- reactiveVal(NULL)
+  vst_counts <- reactiveVal(NULL)#variance stabalized counts
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -25,8 +31,7 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-----Observe UI Event------# ----> merged_gene_counts_uploaded_file
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  observeEvent(input$merged_gene_counts_uploaded_file,
-    {
+  observeEvent(input$merged_gene_counts_uploaded_file,{
       #Upon submission of UI object [ merged_gene_counts_uploaded_file ]      
       
       #Goal:
@@ -48,14 +53,12 @@ server <- function(input, output) {
       
       gene_names(data.frame(func_return[2]))
       
-    }             
-  )
+    })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-----Observe UI Event------# ----> meta_data_conditions_uploaded_file
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  observeEvent(input$meta_data_conditions_uploaded_file,
-    {
+  observeEvent(input$meta_data_conditions_uploaded_file,{
       
       req(input$meta_data_conditions_uploaded_file)
       
@@ -88,14 +91,12 @@ server <- function(input, output) {
       rownames(coldata) <- md[,1]
       
       metaData(coldata)
-    }
-  )
+    })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #---Observe Value Event-----# ----> !is.null(raw_counts)
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  observeEvent(raw_counts(),
-    {
+  observeEvent(raw_counts(),{
       
       if(is.null(raw_counts())){return()}
   
@@ -110,14 +111,16 @@ server <- function(input, output) {
       message <- div(p(span(diff, style="color: red;"), " rows were removed from the data set with row sums < 10"))
     
       showModal(modalDialog(message, easyClose = TRUE, footer=NULL))
-    }
-  )
+    })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #---Observe input Event-----# ----> raw_counts & metaData 
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  Performs DESeq 
-  observeEvent(input$run_DESeq2,
-    {
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
+  #Performs DESeq with standard 1 condition design
+  #sets results_ddsc() to the result matrix of the DESeq2 object
+  #If the app is used with a raw counts matrix and DESeq2 is run ddsc() will be
+  #a DESeqDataSet NOT a results matrix like when using DEG results 
+  observeEvent(input$run_DESeq2,{
       if(is.null(filtered_counts()) || nrow(filtered_counts()) <= 0 ){
         message <- p(span("Merged counts table required", style="color: red;"))
         showModal(modalDialog(message, easyClose=TRUE, footer=NULL))
@@ -131,8 +134,9 @@ server <- function(input, output) {
       
       Sys.sleep(.5)
       showModal(modalDialog(
-          div(p("Would you like to generate a DEG dataset with the given raw counts & meta data"), 
-          p("This action will lock you out of uploading an already generated DEG table and will run DESeq2 with default parameters for your data"))
+          div(p("Would you like to generate a DEG dataset with the given raw counts & meta data."), 
+          p("This action will lock you out of uploading an already generated DEG table and will run DESeq2 with default parameters for your data."),
+          p("If you have previously uploaded a DEG file it will be scrapped from the application, all tables will display the new DESeq2 data, visuals and graphs will also be updated accordingly."))
           ,
           footer=tagList(
             actionButton('cancel', 'Cancel'),
@@ -140,16 +144,16 @@ server <- function(input, output) {
           )
         )
       )
-    }
-  )
+    }) #Observe to see if everything is good
   observeEvent(input$cancel,{
     run_question(NULL)
     removeModal()
-  })
+  }) #if cancel sumbit run DESeq2
   observeEvent(input$run,{
     run_question(TRUE)
+    kill_deg(TRUE)
     removeModal()
-  })
+  })#if confirm sumbit run DESeq2
   observe({
     decision <- run_question()
     
@@ -181,7 +185,8 @@ server <- function(input, output) {
         removeModal()
        
         Cvst <- vst(ddsc(), blind=TRUE)
-        vst_counts(assay(Cvst))
+        vst_counts(data.frame(assay(Cvst)))
+        vst_counts_VST_OBJECT(Cvst)
         
       }else{
         return()
@@ -190,13 +195,17 @@ server <- function(input, output) {
       return()
     }
     
-  })
+  }) #Run
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #---Observe input Event-----# ----> DEG_analysis_data
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  Takes in the DEG format data
-  observeEvent(input$DEG_analysis_data,
-   {
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
+  #Takes in the DEG format data and puts it a format that will be processed by the 
+  #rest of the app
+  #vst_counts() is set here
+  #ddsc() in the case of an uploaded DEG file is just a datafram == to results_ddsc()
+  #results_ddsc() is the same as ddsc() if DEG is used rather than DESeq2
+  observeEvent(input$DEG_analysis_data,{
  
      filePath <- input$DEG_analysis_data$datapath
      
@@ -232,19 +241,33 @@ server <- function(input, output) {
      
      if(ncol(data) < 9){
        showModal(modalDialog(
-         tags$p(style = "color: red;","The vst counts are not present in this file"), easyClose = TRUE, footer=NULL)
+         tags$p(style = "color: red;","There doesn't seem to be any variance stabalized counts in your file, without them you may lose access to some features"), easyClose = TRUE, footer=NULL)
        )
+     }else{
+       
+       gene_names(data[,2:1])
+       
+       deg <- data[1:8]
+       
+       deg <- deg %>% select(-gene_name)
+       
+       deg <- deg %>% tibble::column_to_rownames('gene')
+       
+       results_ddsc(deg)
+       
+       sample_columns <- colNames[9:ncol(data)]
+       stuff <- data.frame(data[,9:ncol(data)])
+       stuff <- stuff %>% mutate(gene = gene_names()$gene)
+       stuff <- stuff %>% tibble::column_to_rownames('gene')
+       
+       vst_counts(stuff)
+       
+       if(is.null(metaData())){
+         showModal(modalDialog(
+           tags$p(style = "color: red;","For a full analysis it is recomended to return to page one and submit a proper meta data file"), easyClose = TRUE, footer=NULL))
+       }
        return()
-     }
-     
-     sample_columns <- colNames[9:ncol(data)]
-     
-     if(length(sample_columns) < 2){
-       showModal(modalDialog(
-         tags$p(style = "color: red;","There is only one sample column present in your file"), easyClose = TRUE, footer=NULL)
-       )
-       return()
-     }
+    }
      
      gene_names(data[,2:1])
      
@@ -254,22 +277,57 @@ server <- function(input, output) {
      
      deg <- deg %>% tibble::column_to_rownames('gene')
      
-     ddsc(deg)
      results_ddsc(deg)
      
-     stuff <- data.frame(data[,9:ncol(data)])
-     stuff <- stuff %>% mutate(gene = gene_names()$gene)
-     stuff <- stuff %>% tibble::column_to_rownames('gene')
-     
-     vst_counts(stuff)
-    }
-  )
+  })
+  #If metaData and the DEG analysis info has been uploaded than ddsc() object DESeq2 dataset, 
+  #and a DESeqTransform object will take the place of vst_counts_VST_OBJECT
+  #A DESeqTransform is similar in that you can see the assays, in this case the counts they uploaded
+  #(they have not been transformed like in the vst object as uploading a DEG you assumed responsibility for
+  #normilization, due to this the size factors are not available for display), 
+  #you may use plotPCA to plot principle components which is the primary use of the vst_counts
+  # ALL other visuals volcano and counts plots do not require this specific object.
+  observeEvent(list(metaData(), input$DEG_analysis_data), {
+    
+    if(is.null(input$DEG_analysis_data)){return()}
+    if(is.null(metaData())){return()}
+    if(is.null(vst_counts())){return()}
+
+    vstcounts <- vst_counts()    
+    
+    datamatrix <- as.matrix(round(vstcounts))
+    
+    coldata <- metaData()
+    
+    cond <- factor(metaData()[,1])
+    
+    print(head(datamatrix))
+    print(coldata)
+    print(cond)
+    
+    dds <- DESeqDataSetFromMatrix(countData = datamatrix, colData = coldata, design = ~ cond)
+    
+    ddsc(dds)
+    
+    se <- SummarizedExperiment(assays = list(counts = vstcounts), colData = colData(dds))
+    
+    vsd <- DESeqTransform(se)
+    
+    vst_counts_VST_OBJECT(vsd)
+    
+  })
+  
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #---Observe Value Event-----# ----> ddsc()
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  splits set by given cutoff values
-  observeEvent(list(results_ddsc(),input$cutOffs),
-   {
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
+  #splits set by given cutoff values
+  #Default:
+  #down regulated  < -0.5
+  #up regulated > 0.5
+  #Anything else is classified as no regulation
+  #up(), down(), noR() are all set and reset here upon inputs
+  observeEvent(list(results_ddsc(),input$cutOffs),{
      
      if(is.null(results_ddsc())){
        return()
@@ -280,18 +338,11 @@ server <- function(input, output) {
      down(data.frame(func_return[2]))
      noR(data.frame(func_return[3]))
      
-   }
-  )
+   })
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #------------errorMessages(pg#)----------#
-  #~~~~~~~~~~~~~~~Text Value~~~~~~~~~~~~~~~#
-  #For displaying Error messegaes
-  
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #--------raw_counts_PreviewTable---------#
@@ -302,8 +353,7 @@ server <- function(input, output) {
     #axis.names| Gene Name | Sample1 | Sample 2 
     #Gene_ID_1 |    x      |    x    |    x
     #Gene_ID_2 |    x      |    x    |    x
-  output$raw_counts_PreviewTable <- renderDT(
-    {
+  output$raw_counts_PreviewTable <- renderDT({
       
       req(input$merged_gene_counts_uploaded_file)
       
@@ -322,40 +372,39 @@ server <- function(input, output) {
         
       }
       
-    }, rownames = TRUE, options = list(pageLength=5)
-  )
+    }, rownames = TRUE, options = list(pageLength=5))
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #--------sample_conditions_Preview-------#
   #~~~~~~~~~~~~~~~~~Table~~~~~~~~~~~~~~~~~~#
-  output$sample_conditions_PreviewTable <- renderTable(
-    {
+  #Just prints the samples and their conditions 
+  #May be helpful to ensure your file was read correctly
+  output$sample_conditions_PreviewTable <- renderTable({
       if(!is.null(metaData())){
         
         t(metaData())
         
       }
-    }
-  )
+    })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-----DESeq_Expression_Analysis_Tables---#
   #~~~~~~~~~~~~~~~~~HTML UI~~~~~~~~~~~~~~~~#
-  output$DESeq_Expression_Analysis_Tables <- renderUI(
-    {
+  #A ui div element featuring a series of interactable tables that show gene data
+  output$DESeq_Expression_Analysis_Tables <- renderUI({
       
       return_ui <- NULL
       
       if(is.null(up())){
-        return_ui <- h1(span("No Data Yet",style="color: red;"))
+        return_ui <- p(span("No Data Yet",style="color: red;"))
         return_ui
       }else
       if(is.null(down())){
-        return_ui <- h1(span("No Data Yet",style="color: red;"))
+        return_ui <- p(span("No Data Yet",style="color: red;"))
         return_ui
       }else
       if(is.null(noR())){
-        return_ui <- h1(span("No Data Yet",style="color: red;"))
+        return_ui <- p(span("No Data Yet",style="color: red;"))
         return_ui
       }else{
       
@@ -389,19 +438,18 @@ server <- function(input, output) {
       
       
       
-    }
-  )
+    })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #--------DEG_Distribution_Histogram------#
   #~~~~~~~~~~~~~~~~~Histogram~~~~~~~~~~~~~~#
-  output$DEG_Distribution_Histogram <- renderPlot(
-    {
+  #A simple histogram for a visual display of the distribution or regulation
+  output$DEG_Distribution_Histogram <- renderPlot({
       if(is.null(results_ddsc())){return()}
       data <- results_ddsc() %>% filter(padj < as.numeric(input$pvalue))
       data <- data %>% select('log2FoldChange')
       
-      ggplot(data, aes(x=data$log2FoldChange)) + 
+      ggplot(data, aes(x=log2FoldChange)) + 
         geom_histogram(bins=50, fill='darkslategrey') + 
         xlab("Log2 Fold Change") + 
         ylab("") + 
@@ -410,16 +458,15 @@ server <- function(input, output) {
               panel.grid.minor.y = element_blank(),
               panel.grid.minor.x = element_blank(),
               panel.grid.major.y = element_blank(),
-              x.axis.line = element_line(),
-              y.axis.line = element_blank(),
+              axis.line.x = element_blank(),
+              axis.line.y = element_blank(),
               plot.margin = margin(75, 15, 0, -5, "pt"),
               axis.text.x = element_text(color = "black", size = 15),
               axis.title.x = element_text(size = 15),) 
       
-    }
-  )
-  output$Distribution_Hitogram_ui <- renderUI(
-    {
+    })
+  #UI for histogram display and title
+  output$Distribution_Histogram_ui <- renderUI({
       if(is.null(results_ddsc())){return()}
       
       div(
@@ -431,27 +478,93 @@ server <- function(input, output) {
         plotOutput('DEG_Distribution_Histogram')
       
         )
-    }
-  )
+    })
   
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-----pg2_display_upload_DEG_data--------#
-  #~~~~~~~~~~~~~Conditional Ui~~~~~~~~~~~~~#
+  #~~~~~~~~~~~~~Conditional UI~~~~~~~~~~~~~#
   # Decides whether to display the upload form for the DEG data based on whether 
   # the user has uploaded counts and metadata to perform DESeq2
   #@return either an upload form or nothing
-  
-  output$pg2_display_upload_DEG_data <- renderUI(
-    {
-      if(is.null(ddsc())){
+  output$pg2_display_upload_DEG_data <- renderUI({
+      
+    if(is.null(kill_deg())){
         widget <- fileInput("DEG_analysis_data", "Differential Expression data .tsv/.csv")
         widget
       }else{
         return()
       }
+    })
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #-------vst_counts_PreviewTable----------#
+  #~~~~~~~~~~~~~~~~dataTable~~~~~~~~~~~~~~~#
+  # A DataTable with the variance stabilized transformation of the counts
+  output$vst_counts_PreviewTable <- renderUI({
+    
+    return_ui <- NULL
+    
+    if(is.null(vst_counts())){
+      return_ui <- p(span("No Data Yet",style="color: red;"))
+      return_ui
+    }else{
+    
+      vst <- vst_counts() %>% round(digits = 4)
+      
+      vst <- vst %>% mutate(gene = rownames(vst_counts()))
+      
+      vst <- left_join(vst, gene_names()) %>% select(-gene)
+      
+      pvals <- results_ddsc() %>% mutate(gene = rownames(results_ddsc())) %>%
+        left_join(gene_names()) %>% select(gene_name, padj)
+      
+      vst <- left_join(vst, pvals, relationship="many-to-many") 
+      
+      vst <- vst %>% filter(padj < as.numeric(input$pvaluePg3))
+      
+      vst <- vst[order(vst$padj),c((ncol(vst) - 1), ncol(vst), 1:(ncol(vst) - 2))]
+      
+      return_ui <- datatable(vst, rownames=FALSE, options = list(pageLength=15))
+      
+      return_ui
+      
     }
-  )
+    
+  })
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #----------Extra_vst_count_info----------# #Size factors only right now
+  #~~~~~~~~~~~~~~~~UI output~~~~~~~~~~~~~~~#
+  output$Extra_vst_count_info <- renderUI({
+    
+    if(is.null(vst_counts())){
+      return_ui <- p(span("No Data Yet",style="color: red;"))
+      return_ui
+    }else{
+     
+      sF <- div()
+      if(!is.null(kill_deg())){
+        size <- as.matrix(sizeFactors(ddsc()) %>% round(digits = 3))
+        print(size)
+        sF <- div(h4("Size Factors"), renderTable({t(size)}))
+      }else{print("doody butt")}
+      
+      div(sF)
+    }
+    
+  })
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #----------------PCA_PLOTS---------------# 
+  #~~~~~~~~~~~~~~~~UI output~~~~~~~~~~~~~~~#
+  output$PCA_PLOTS <- renderUI({
+      #TODO
+  })
+  
+  
+  
+  
   
 }#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
 

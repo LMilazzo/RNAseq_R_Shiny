@@ -9,6 +9,7 @@ source("Functions.R")
 library(crayon)
 library(DESeq2)
 library(ggplot2)
+library(matrixStats)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -20,7 +21,6 @@ ui <- navbarPage("DESeq2",
 #-----------------------------File Upload-------------------------------#
 #---------------------------Widget Count: 2-----------------------------#
 #-----------------------Expected output Count: 2------------------------#
-#-----------------------Possible Errors Count: 3------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
    tabPanel("File Upload",
       fluidPage(
@@ -127,9 +127,8 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 2----------------------------------#
 #-----------------------------DESeq2 Info-------------------------------#
-#---------------------------Widget Count: 1-----------------------------#
-#-----------------------Expected output Count: 1------------------------#
-#-----------------------Possible Errors Count: 0------------------------#
+#---------------------------Widget Count: 3-----------------------------#
+#-----------------------Expected output Count: 2------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     tabPanel("DEG Analysis",
       fluidPage(
@@ -169,7 +168,7 @@ ui <- navbarPage("DESeq2",
                                inline=FALSE)
             ,
             
-            uiOutput("Distribution_Hitogram_ui")
+            uiOutput("Distribution_Histogram_ui")
             
           ), ##XX##~~~Side Panel End~~~##XX##
           
@@ -197,7 +196,65 @@ ui <- navbarPage("DESeq2",
         ) ##XX##~~~Side Bar Layout Closing Bracket~~~##XX##
       ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
     ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
-                 
+    
+    ,
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 3----------------------------------#
+#---------------------------Normalized Counts---------------------------#
+#----------------------------Widget Count: 0----------------------------#
+#-----------------------Expected output Count: 0------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+tabPanel("Normalized Counts Transformation",
+         fluidPage(
+             #_____________________________Main Panel________________________________#
+             
+             mainPanel( 
+               
+               #-----------------input----------------#
+               #----------------pvalue----------------#
+               #--------------------------------------#
+               # A select input giving the choice to change the displayed genes off pvalue
+               # not just resort lists but actually display more or less genes
+               selectInput("pvaluePg3", "Select adjusted P value cutoff for following tables", 
+                           choices=c(1.0 ,0.5, 0.05, 0.01, 0.001))
+               
+               ,
+               
+               HTML("<h3>Normalized Counts Data</h3>")
+               
+               ,
+               
+               #----------------output----------------#
+               #--------vst_counts_PreviewTable-------#
+               #--------------------------------------#
+               #A ui element containing a datatable with the padj 
+               #gene names and vst counts
+               uiOutput('vst_counts_PreviewTable')
+             
+              )##XX##~~~Main Panel End~~~##XX##
+             
+             ,
+             
+             sidebarPanel(
+               
+               uiOutput('Extra_vst_count_info')
+               
+             )
+         ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
+       ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
+
+
+
+
+
+
+
+
+
+
+
+
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
    
    

@@ -5,8 +5,9 @@ server <- function(input, output) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_____________Reactive Values______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  run_question <- reactiveVal(NULL)
-  kill_deg <- reactiveVal(NULL)
+  
+  run_question <- reactiveVal(NULL) #Determines when to run DESeq2
+  kill_deg <- reactiveVal(NULL) #if DESeq2 has been run the DEG upload no longer available
   
   raw_counts <- reactiveVal(NULL)
   gene_names <- reactiveVal(NULL)
@@ -21,8 +22,9 @@ server <- function(input, output) {
   down <- reactiveVal(NULL)
   noR <- reactiveVal(NULL) #No regulation
   
-  vst_counts_VST_OBJECT <- reactiveVal(NULL)
+  vst_counts_VST_OBJECT <- reactiveVal(NULL) #variance stabalized counts OBJECT
   vst_counts <- reactiveVal(NULL)#variance stabalized counts
+
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -53,6 +55,26 @@ server <- function(input, output) {
       
       gene_names(data.frame(func_return[2]))
       
+    })
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #---Observe Value Event-----# ----> !is.null(raw_counts)
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  observeEvent(raw_counts(),{
+      
+      if(is.null(raw_counts())){return()}
+  
+      func_return <- filterCounts(raw_counts())
+
+      filtered_counts(data.frame(func_return))
+
+      r <- raw_counts()
+      f <- filtered_counts()
+      diff <- nrow(r) - nrow(f)
+
+      message <- div(p(span(diff, style="color: red;"), " rows were removed from the data set with row sums < 10"))
+    
+      showModal(modalDialog(message, easyClose = TRUE, footer=NULL))
     })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -94,27 +116,7 @@ server <- function(input, output) {
     })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #---Observe Value Event-----# ----> !is.null(raw_counts)
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  observeEvent(raw_counts(),{
-      
-      if(is.null(raw_counts())){return()}
-  
-      func_return <- filterCounts(raw_counts())
-
-      filtered_counts(data.frame(func_return))
-
-      r <- raw_counts()
-      f <- filtered_counts()
-      diff <- nrow(r) - nrow(f)
-
-      message <- div(p(span(diff, style="color: red;"), " rows were removed from the data set with row sums < 10"))
-    
-      showModal(modalDialog(message, easyClose = TRUE, footer=NULL))
-    })
-  
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #---Observe input Event-----# ----> raw_counts & metaData 
+  #---Observe input Event-----# ----> run_DESeq2
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
   #Performs DESeq with standard 1 condition design
   #sets results_ddsc() to the result matrix of the DESeq2 object
@@ -221,9 +223,7 @@ server <- function(input, output) {
      }else{
        data <- read.csv(filePath)
      }
-     
-     i_swear_you_better_be_the_right_format <- c("gene","gene_name","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
-
+    
      colNames <- colnames(data)
      
      if(ncol(data) < 8){
@@ -232,7 +232,10 @@ server <- function(input, output) {
        )
        return()
      }
-     if(FALSE %in% (colNames[1:8] == i_swear_you_better_be_the_right_format)){
+     
+     format_check <- c("gene","gene_name","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+     
+     if(FALSE %in% (colNames[1:8] == format_check)){
        showModal(modalDialog(
          tags$p(style = "color: red;","This file may not have the correct format or data"), easyClose = TRUE, footer=NULL)
        )
@@ -243,6 +246,19 @@ server <- function(input, output) {
        showModal(modalDialog(
          tags$p(style = "color: red;","There doesn't seem to be any variance stabalized counts in your file, without them you may lose access to some features"), easyClose = TRUE, footer=NULL)
        )
+       
+       gene_names(data[,2:1])
+       
+       deg <- data[1:8]
+       
+       deg <- deg %>% select(-gene_name)
+       
+       deg <- deg %>% tibble::column_to_rownames('gene')
+       
+       results_ddsc(deg)
+       
+       return()
+       
      }else{
        
        gene_names(data[,2:1])
@@ -268,17 +284,6 @@ server <- function(input, output) {
        }
        return()
     }
-     
-     gene_names(data[,2:1])
-     
-     deg <- data[1:8]
-     
-     deg <- deg %>% select(-gene_name)
-     
-     deg <- deg %>% tibble::column_to_rownames('gene')
-     
-     results_ddsc(deg)
-     
   })
   #If metaData and the DEG analysis info has been uploaded than ddsc() object DESeq2 dataset, 
   #and a DESeqTransform object will take the place of vst_counts_VST_OBJECT
@@ -340,10 +345,13 @@ server <- function(input, output) {
      
    })
   
+  
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  
+
+#______________________________Page 1____________________________#
+
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #--------raw_counts_PreviewTable---------#
   #~~~~~~~~~~~~~~Data Table~~~~~~~~~~~~~~~~#
@@ -384,6 +392,24 @@ server <- function(input, output) {
         
         t(metaData())
         
+      }
+    })
+  
+#______________________________Page 2____________________________#
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #-----pg2_display_upload_DEG_data--------#
+  #~~~~~~~~~~~~~Conditional UI~~~~~~~~~~~~~#
+  # Decides whether to display the upload form for the DEG data based on whether 
+  # the user has uploaded counts and metadata to perform DESeq2
+  #@return either an upload form or nothing
+  output$pg2_display_upload_DEG_data <- renderUI({
+      
+    if(is.null(kill_deg())){
+        widget <- fileInput("DEG_analysis_data", "Differential Expression data .tsv/.csv")
+        widget
+      }else{
+        return()
       }
     })
   
@@ -465,7 +491,8 @@ server <- function(input, output) {
               axis.title.x = element_text(size = 15),) 
       
     })
-  #UI for histogram display and title
+  #UI for histogram display and title 
+  #(Prevents the blank plot box from showing when no data)
   output$Distribution_Histogram_ui <- renderUI({
       if(is.null(results_ddsc())){return()}
       
@@ -480,22 +507,7 @@ server <- function(input, output) {
         )
     })
   
-  
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #-----pg2_display_upload_DEG_data--------#
-  #~~~~~~~~~~~~~Conditional UI~~~~~~~~~~~~~#
-  # Decides whether to display the upload form for the DEG data based on whether 
-  # the user has uploaded counts and metadata to perform DESeq2
-  #@return either an upload form or nothing
-  output$pg2_display_upload_DEG_data <- renderUI({
-      
-    if(is.null(kill_deg())){
-        widget <- fileInput("DEG_analysis_data", "Differential Expression data .tsv/.csv")
-        widget
-      }else{
-        return()
-      }
-    })
+  #______________________________Page 3____________________________#
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-------vst_counts_PreviewTable----------#

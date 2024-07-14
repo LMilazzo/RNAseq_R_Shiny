@@ -34,12 +34,14 @@ Set_Clean_Counts <- function(raw_counts_table){
       return("Error")
   }
   
+  #READ as a .tsv or .csv
   if(grepl('.tsv', raw_counts_table, fixed=TRUE)){
     count <- read.csv(raw_counts_table, sep="\t")
   }else{
     count <- read.csv(raw_counts_table)
   }
 
+  #gene names and ids are recommended 
   if(!'gene_id' %in% colnames(count) || !'gene_name' %in% colnames(count)){
     return("Bad .tsv")
   }
@@ -49,14 +51,11 @@ Set_Clean_Counts <- function(raw_counts_table){
                 mutate(gene = gene_id) %>%
                 select(-gene_id)
   
+  count <- count %>% 
+           select(-gene_name) %>% 
+           tibble::column_to_rownames('gene_id')
   
-  count <- count %>% select(-gene_name)
-  
-  count <- count %>% tibble::column_to_rownames('gene_id')
-  
-  count <- as.matrix(count)
-  
-  return( list(count, gene_names) )
+  return( list( as.matrix(count) , gene_names ) )
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -107,14 +106,17 @@ splitByExpr <- function(data, gene_names, cut){
   res <- data.frame(data)
   
   up <- res %>% filter(log2FoldChange > upperBound)
-  up <- up[order(up$padj),]
+  up <- up[order(up$padj) , ]
   
   down <- res %>% filter(log2FoldChange < lowerBound)
-  down <- down[order(down$padj),]
+  down <- down[order(down$padj) , ]
   
-  noR <- res %>% filter(log2FoldChange > lowerBound) %>% filter(log2FoldChange < upperBound)
-  noR <- noR[order(noR$padj),]
+  noR <- res %>% 
+         filter(log2FoldChange > lowerBound) %>% 
+         filter(log2FoldChange < upperBound)
   
-  return(list(up, down, noR))
+  noR <- noR[order(noR$padj) , ]
+  
+  return( list( up, down, noR ) )
   
 }

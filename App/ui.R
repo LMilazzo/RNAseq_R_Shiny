@@ -30,13 +30,8 @@ ui <- navbarPage("DESeq2",
           sidebarPanel(
             
             HTML("<p>(Optional If you still need to run the DEG process for your data)</p>"),
-            HTML("<p>If you already have this done and a file with data skip this page</p>")
-            
-            ,
-            
-            HTML("<h2>Upload Data</h1>")
-            
-            ,
+            HTML("<p>If you already have this done and a file with data skip this page</p>"),
+            HTML("<h2>Upload Data</h1>"),
             
             #-----------------input----------------#
             #---merged_gene_counts_uploaded_file---#
@@ -50,13 +45,8 @@ ui <- navbarPage("DESeq2",
             ,
            
             HTML("<p>(Not Optional)</p>"),
-            HTML("<p>Meta Data and conditions is needed for analysis</p>")
-            
-            ,
-            
-            HTML("<h2>Upload Meta Data</h1>")
-            
-            ,
+            HTML("<p>Meta Data and conditions is needed for analysis</p>"),
+            HTML("<h2>Upload Meta Data</h1>"),
             
             #-----------------input----------------#
             #--meta_data_conditions_uploaded_file--#
@@ -86,9 +76,7 @@ ui <- navbarPage("DESeq2",
             HTML("<h1>Raw Counts Table</h1>"),
             HTML("<p1>Upload your salmon merged counts matrix on the left. Your 
                  uploaded file must be a .tsv file. Below you can explore and search
-                 through your unfiltered data once uploaded.")
-            
-            ,
+                 through your unfiltered data once uploaded."),
             
             #----------------output----------------#
             #--------raw_counts_PreviewTable-------#
@@ -105,9 +93,7 @@ ui <- navbarPage("DESeq2",
             
             HTML("<h1>Conditions (meta data) Table</h1>"),
             HTML("<p1>Upload a .csv file with the samples in column 1 and their 
-                 conditions in column 2.")
-            
-            ,
+                 conditions in column 2."),
             
             #----------------output----------------#
             #----sample_conditions_PreviewTable----#

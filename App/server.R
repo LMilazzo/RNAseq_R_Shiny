@@ -22,7 +22,7 @@ server <- function(input, output) {
   down <- reactiveVal(NULL)
   noR <- reactiveVal(NULL) #No regulation
   
-  vst_counts_VST_OBJECT <- reactiveVal(NULL) #variance stabalized counts OBJECT
+  vst_Obj <- reactiveVal(NULL) #variance stabalized counts OBJECT
   vst_counts <- reactiveVal(NULL)#variance stabalized counts
 
   
@@ -33,53 +33,71 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-----Observe UI Event------# ----> merged_gene_counts_uploaded_file
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  # Process:
+  # Reads the uploaded file with Set_Clean_Counts() function returning a list with 
+  # the raw counts matrix and a dataframe of gene names and ids
+  # Takes out gene names and ids and sets gene_names() rownames = gene_id, col1 = gene names
+  # Sets raw_counts() colnames = samples, rownames = gene ids
+  # Sets filtered_counts() by calling filterCounts() on the raw_counts() to filter any rows with
+  # sum < 10
+  # 
+  # Error:
+  # Will return an error if neither a .csv or .tsv were uploaded
+  # Will return an error if either gene names or gene ids columns were not present
+  # Will return an error if there is a duplicate value in the gene_id column
+  # 
+  # Notes: 
+  # Gene ids CAN be arbitrary, but MUST be unique
+  # Will display the number of rows filtered from the data
   observeEvent(input$merged_gene_counts_uploaded_file,{
-      #Upon submission of UI object [ merged_gene_counts_uploaded_file ]      
       
-      #Goal:
-      #             |#----->> gene_names
-      #   input ----|
-      #             |#----->> raw_counts
-
       #Expect as return c(raw_counts, gene_names)           
       func_return <- Set_Clean_Counts(input$merged_gene_counts_uploaded_file$datapath)
       
-      #Error PG1.0
       if(length(func_return) == 1){
         showModal(modalDialog(
-          tags$p(style = "color: red;","Error: Raw Counts upload must be a valid file type (.tsv, .csv)"), easyClose = TRUE, footer=NULL))
+          div(
+            span(
+              div(
+                p("Possible Errors: "),
+                p(" - Raw Counts upload was not valid file type (.tsv, .csv)"),
+                p(" - Raw Counts upload did not include required 'gene_name' and 'gene_id' columns"),
+                p(" - There were duplicate identifiers in the gene_id column (ids be abitrary but must be unique)")
+              ),
+              style="color: red;")
+          ), 
+        easyClose = TRUE, footer=NULL))
         return()
       }
       
       raw_counts(data.frame(func_return[1]))
-      
       gene_names(data.frame(func_return[2]))
       
-    })
-  
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #---Observe Value Event-----# ----> !is.null(raw_counts)
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  observeEvent(raw_counts(),{
+      filtered_counts( filterCounts(raw_counts()))
       
-      if(is.null(raw_counts())){return()}
-  
-      func_return <- filterCounts(raw_counts())
-
-      filtered_counts(data.frame(func_return))
-
-      r <- raw_counts()
-      f <- filtered_counts()
-      diff <- nrow(r) - nrow(f)
-
-      message <- div(p(span(diff, style="color: red;"), " rows were removed from the data set with row sums < 10"))
-    
-      showModal(modalDialog(message, easyClose = TRUE, footer=NULL))
+      diff <- nrow( raw_counts() ) - nrow( filtered_counts() )
+      
+      showModal(modalDialog(div(p(span(diff, style="color: red;"), 
+          " rows were removed from the data set with row sums < 10")), 
+        easyClose = TRUE, footer=NULL))
     })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-----Observe UI Event------# ----> meta_data_conditions_uploaded_file
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  # Process:
+  # Will set the path to the datapath of the uploaded file
+  # Will read the data from the file
+  # Sets the metaData() dataframe to be a single column with factored conditions
+  # that werre present in column 2 of the uploaded file
+  # rownames for metaData() will be the sample names present in col 1 of the uploaded file
+  # 
+  # Error:
+  # Will return an error if the upload is not a .csv or .tsv file
+  # Will return an error if the uploaded file does not have at least 2 columns to work with
+  # 
+  # Notes:
+  # More columns are fine however only the first and second are considered
   observeEvent(input$meta_data_conditions_uploaded_file,{
       
       req(input$meta_data_conditions_uploaded_file)
@@ -100,13 +118,13 @@ server <- function(input, output) {
       }
       
       #Error PG1.2
-      if( ncol(md) != 2 ){
+      if( ncol(md) < 2 ){
         showModal(modalDialog(
           tags$p(style = "color: red;","Error: Incorrect file format"), easyClose = TRUE, footer=NULL))
         return()
       }
       
-      cond <- factor(md[,2])
+      cond <- md[,2]
       
       coldata <- data.frame(cond)
       
@@ -118,10 +136,17 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #---Observe input Event-----# ----> run_DESeq2
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
-  #Performs DESeq with standard 1 condition design
-  #sets results_ddsc() to the result matrix of the DESeq2 object
-  #If the app is used with a raw counts matrix and DESeq2 is run ddsc() will be
-  #a DESeqDataSet NOT a results matrix like when using DEG results 
+  # Process:
+  # Determines whether upon input of the run differential expression button the 
+  # required data has been uploaded
+  # 
+  # Error:
+  # will return an error if the filtered_counts() object is null or as 0 rows
+  # will return an error if the metaData() object is null
+  # 
+  # Notes:
+  # Displays a modal with information and warnings about running DESeq
+  # Displays a cancel or run button in response to the information above
   observeEvent(input$run_DESeq2,{
       if(is.null(filtered_counts()) || nrow(filtered_counts()) <= 0 ){
         message <- p(span("Merged counts table required", style="color: red;"))
@@ -146,16 +171,31 @@ server <- function(input, output) {
           )
         )
       )
-    }) #Observe to see if everything is good
+    })
+  # Cancels the modal and does not run DESeq if cancel button is selected
   observeEvent(input$cancel,{
     run_question(NULL)
     removeModal()
-  }) #if cancel sumbit run DESeq2
+  }) 
+  # Sets the run_question() object to true if selected 
+  # This is used so that if run is selected multiple times with the same data DESeq is not
+  # activated again and the user has to wait Also so when input$run is observed in the future
+  # DESeq2 does not activate again by mistake
+  # Sets kill_DEG() to TRUE to remove the option on page 2 for uploaded DEG results and starting 
+  # from there
   observeEvent(input$run,{
     run_question(TRUE)
     kill_deg(TRUE)
     removeModal()
-  })#if confirm sumbit run DESeq2
+  })
+  # Runs DESeq 2 upon input of input$run with mostly default parameters and single 
+  # condition design.
+  # Sets the ddsc() object to be a DESeqDataSet class object with the data from the experiment
+  # Sets the results_ddsc() to be a dataframe consisting of the output of running results() on 
+  # the ddsc() object. This should just be a dataframe with the DEG results
+  # Sets vst_counts() to be the assay() data.frame of the variance stabilized transformation of the 
+  # counts matrix
+  # Sets vst_Obj() to be the variance stabilized counts object obtained from the vst() funciton
   observe({
     decision <- run_question()
     
@@ -163,23 +203,24 @@ server <- function(input, output) {
       if(decision){
         removeModal()
         
-        datamatrix <- as.matrix(filtered_counts())
-        
         coldata <- metaData()
         
-        cond <- factor(metaData()[,1])
+        cond <- as.factor(coldata$cond)
         
-        print(head(datamatrix))
+        print(head(filtered_counts()))
         print(coldata)
         print(cond)
         
-        d <- DESeqDataSetFromMatrix(countData = datamatrix, 
+        ddsc <- DESeqDataSetFromMatrix(countData = round(filtered_counts()), 
                                     colData = coldata, 
                                     design = ~ cond)
         
         showModal(modalDialog("Running DESeq...", footer=NULL))
         
-        ddsc(DESeq(d))
+        d <- DESeq(ddsc)
+        
+        ddsc(d)
+        
         results_ddsc(data.frame(results(ddsc())))
         
         showModal(modalDialog("Done!!", easyClose=TRUE, footer=NULL))
@@ -188,7 +229,7 @@ server <- function(input, output) {
        
         Cvst <- vst(ddsc(), blind=TRUE)
         vst_counts(data.frame(assay(Cvst)))
-        vst_counts_VST_OBJECT(Cvst)
+        vst_Obj(Cvst)
         
       }else{
         return()
@@ -197,16 +238,26 @@ server <- function(input, output) {
       return()
     }
     
-  }) #Run
+  }) 
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #---Observe input Event-----# ----> DEG_analysis_data
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
-  #Takes in the DEG format data and puts it a format that will be processed by the 
-  #rest of the app
-  #vst_counts() is set here
-  #ddsc() in the case of an uploaded DEG file is just a datafram == to results_ddsc()
-  #results_ddsc() is the same as ddsc() if DEG is used rather than DESeq2
+  # Process:
+  # On page 2 if DEG results are uploaded they will be read
+  # The DEG results will be put in the results_ddsc() this should be the first 8 cols
+  # of any uploaded DEG results.
+  # The gene_names() object is set to the first and second columns of the DEG results dataframe
+  # results_ddsc() is  set to be the DEG results -gene_name columns and with gene_id as rownames
+  # Sets vst_counts() to any columns after the 8th which are designated to user variance stabalized
+  # transformation counts. The counts put in vst_counts() with this method are expected to be normalized
+  # vst() is not called on them.
+  # 
+  # Error:
+  # Will return an error if.tsv or .csv are not in the file path
+  # Will return an error if there are less than 8 columns indicated the required 
+  # data isnt present
+  # Will return an error if the header format does not match the expected format
   observeEvent(input$DEG_analysis_data,{
  
      filePath <- input$DEG_analysis_data$datapath
@@ -233,7 +284,7 @@ server <- function(input, output) {
        return()
      }
      
-     format_check <- c("gene","gene_name","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+     format_check <- c("gene_id","gene_name","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
      
      if(FALSE %in% (colNames[1:8] == format_check)){
        showModal(modalDialog(
@@ -253,7 +304,7 @@ server <- function(input, output) {
        
        deg <- deg %>% select(-gene_name)
        
-       deg <- deg %>% tibble::column_to_rownames('gene')
+       deg <- deg %>% tibble::column_to_rownames('gene_id')
        
        results_ddsc(deg)
        
@@ -267,16 +318,17 @@ server <- function(input, output) {
        
        deg <- deg %>% select(-gene_name)
        
-       deg <- deg %>% tibble::column_to_rownames('gene')
+       deg <- deg %>% tibble::column_to_rownames('gene_id')
        
        results_ddsc(deg)
        
-       sample_columns <- colNames[9:ncol(data)]
-       stuff <- data.frame(data[,9:ncol(data)])
-       stuff <- stuff %>% mutate(gene = gene_names()$gene)
-       stuff <- stuff %>% tibble::column_to_rownames('gene')
+       sample_names <- colNames[9:ncol(data)]
+       sample_counts <- data.frame(data[,9:ncol(data)])
+       sample_counts <- sample_counts %>% 
+         mutate(gene_id = gene_names()$gene_id) %>% 
+         tibble::column_to_rownames('gene_id')
        
-       vst_counts(stuff)
+       vst_counts(sample_counts)
        
        if(is.null(metaData())){
          showModal(modalDialog(
@@ -318,13 +370,13 @@ server <- function(input, output) {
     
     vsd <- DESeqTransform(se)
     
-    vst_counts_VST_OBJECT(vsd)
+    vst_Obj(vsd)
     
   })
   
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #---Observe Value Event-----# ----> ddsc()
+  #---Observe Value Event-----# ----> results_ddsc()
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
   #splits set by given cutoff values
   #Default:
@@ -369,12 +421,12 @@ server <- function(input, output) {
       
       if(!is.null(df)){
         
-        df$gene <- row.names(df)
+        df$gene_id <- row.names(df)
         
         #Some editing to display the gene names as well
         df <- left_join(df, gene_names())
         
-        df <- df %>% tibble::column_to_rownames('gene')
+        df <- df %>% tibble::column_to_rownames('gene_id')
         
         data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
         
@@ -388,11 +440,7 @@ server <- function(input, output) {
   #Just prints the samples and their conditions 
   #May be helpful to ensure your file was read correctly
   output$sample_conditions_PreviewTable <- renderTable({
-      if(!is.null(metaData())){
-        
-        t(metaData())
-        
-      }
+      if(!is.null(metaData())){t(metaData())}
     })
   
 #______________________________Page 2____________________________#
@@ -524,11 +572,13 @@ server <- function(input, output) {
     
       vst <- vst_counts() %>% round(digits = 4)
       
-      vst <- vst %>% mutate(gene = rownames(vst_counts()))
+      vst <- vst %>% mutate(gene_id = rownames(vst_counts()))
       
-      vst <- left_join(vst, gene_names()) %>% select(-gene)
       
-      pvals <- results_ddsc() %>% mutate(gene = rownames(results_ddsc())) %>%
+      vst <- left_join(vst, gene_names()) %>% select(-gene_id)
+      print(head(vst))
+      
+      pvals <- results_ddsc() %>% mutate(gene_id = rownames(results_ddsc())) %>%
         left_join(gene_names()) %>% select(gene_name, padj)
       
       vst <- left_join(vst, pvals, relationship="many-to-many") 
@@ -560,7 +610,7 @@ server <- function(input, output) {
         size <- as.matrix(sizeFactors(ddsc()) %>% round(digits = 3))
         print(size)
         sF <- div(h4("Size Factors"), renderTable({t(size)}))
-      }else{print("doody butt")}
+      }else{print("error")}
       
       div(sF)
     }

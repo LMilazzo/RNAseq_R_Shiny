@@ -31,31 +31,36 @@ library(dplyr)
 Set_Clean_Counts <- function(raw_counts_table){
   
   if( !grepl('.tsv', raw_counts_table, fixed=TRUE) && !grepl('.csv', raw_counts_table, fixed=TRUE)){
-      return("Error")
+      return("Bad File Type Error")
   }
   
   #READ as a .tsv or .csv
   if(grepl('.tsv', raw_counts_table, fixed=TRUE)){
-    count <- read.csv(raw_counts_table, sep="\t")
+    counts <- read.csv(raw_counts_table, sep="\t")
   }else{
-    count <- read.csv(raw_counts_table)
+    counts <- read.csv(raw_counts_table)
   }
 
   #gene names and ids are recommended 
-  if(!'gene_id' %in% colnames(count) || !'gene_name' %in% colnames(count)){
-    return("Bad .tsv")
+  if(!'gene_id' %in% colnames(counts) || !'gene_name' %in% colnames(counts)){
+    return("Missing Column Error")
   }
-
-  gene_names <- count %>% 
-                select(gene_name , gene_id) %>%
-                mutate(gene = gene_id) %>%
-                select(-gene_id)
   
-  count <- count %>% 
+  #Check for duplicated Gene IDS
+  g_ids <- counts %>% select(gene_id)
+  g_ids_unique <- g_ids %>% unique()
+  if(nrow(g_ids) != nrow(g_ids_unique)){
+    return("Duplicate Gene IDS")
+  }
+  
+  gene_names <- counts %>% 
+                select(gene_name , gene_id)
+  
+  counts <- counts %>% 
            select(-gene_name) %>% 
            tibble::column_to_rownames('gene_id')
   
-  return( list( as.matrix(count) , gene_names ) )
+  return( list( as.matrix(counts) , gene_names ) )
 }
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -67,18 +72,16 @@ Set_Clean_Counts <- function(raw_counts_table){
 #@return the matrix of filtered counts
 #@return the number of rows deleted
 filterCounts <- function(counts){
-
-  fcounts <- counts
   
-  keep <- rowSums(fcounts) > 10
+  keep <- rowSums(counts) > 10
   
-  fcounts <- fcounts[keep,]
+  counts <- counts[keep,]
   
-  fcounts <- round(fcounts)
+  counts <- counts
   
-  fcounts <- as.matrix(fcounts)
+  counts <- as.matrix(counts)
   
-  return(fcounts)
+  return(counts)
 }
 
 
@@ -94,9 +97,9 @@ splitByExpr <- function(data, gene_names, cut){
   lowerBound <- cut[1]
   upperBound <- cut[2]
   
-  data$gene <- row.names(data)
+  data$gene_id <- row.names(data)
   
-  data <- left_join(data, gene_names) %>% select(-gene)
+  data <- left_join(data, gene_names) %>% select(-gene_id)
   
   
   colOrder <- c('gene_name', 'baseMean', 'log2FoldChange', 'lfcSE', 'stat', 'pvalue', 'padj')

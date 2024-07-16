@@ -351,22 +351,19 @@ server <- function(input, output) {
     if(is.null(vst_counts())){return()}
 
     vstcounts <- vst_counts()    
-    
-    datamatrix <- as.matrix(round(vstcounts))
-    
+  
     coldata <- metaData()
     
-    cond <- factor(metaData()[,1])
+    cond <- factor(coldata[,1])
     
-    print(head(datamatrix))
-    print(coldata)
-    print(cond)
+    coldata <- data.frame(coldata)
+    coldata$cond <- cond
     
-    dds <- DESeqDataSetFromMatrix(countData = datamatrix, colData = coldata, design = ~ cond)
+    dds <- DESeqDataSetFromMatrix(countData = as.matrix(round(vstcounts)), colData = coldata, design = ~ cond)
     
     ddsc(dds)
     
-    se <- SummarizedExperiment(assays = list(counts = vstcounts), colData = colData(dds))
+    se <- SummarizedExperiment(assays = list(counts = as.matrix(vstcounts)), colData = coldata)
     
     vsd <- DESeqTransform(se)
     
@@ -617,15 +614,57 @@ server <- function(input, output) {
     
   })
   
+  #______________________________Page 4____________________________#
+  
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #----------------PCA_PLOTS---------------# 
-  #~~~~~~~~~~~~~~~~UI output~~~~~~~~~~~~~~~#
-  output$PCA_PLOTS <- renderUI({
-      #TODO
+  #-------principle_component_plots--------#
+  #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
+  # A Simple PCA plot using plotPCA
+  output$pca_plot1 <- renderPlot({
+    if(is.null(vst_Obj())){return()}
+    
+    plotPCA(vst_Obj(), intgroup=c('cond'), ntop=input$pca_nrow)
+    
   })
-  
-  
-  
+  output$principle_component_plots <- renderUI({
+    
+    if(is.null(vst_Obj())){
+      return_ui <- span("No Data Yet",style="color: red;")
+      return_ui
+    }else{
+      
+      div(
+        
+        HTML("<h4>Principle Component Analysis</h4>")
+        
+        ,
+        
+        plotOutput('pca_plot1')
+        
+      )
+    }
+    
+    
+    
+  })
+  output$change_n <- renderUI({
+    
+    m <- 500
+    
+    if(is.null(vst_counts())){
+      m <- 500
+    }else{
+      m <- nrow(vst_counts())
+    }
+    
+    div(
+      p("This number determines how many genes are included in the PCA ranked by variance."),
+      p("If the default 500 is selected the top 500 genes with the most variance will be used."),
+      
+      numericInput('pca_nrow', '', 
+                   value=500, min=250, max=m)
+    )
+  })
   
   
 }#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

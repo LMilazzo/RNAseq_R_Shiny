@@ -10,6 +10,8 @@ library(crayon)
 library(DESeq2)
 library(ggplot2)
 library(matrixStats)
+library(S4Vectors)
+library(SummarizedExperiment)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -188,8 +190,8 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 3----------------------------------#
 #---------------------------Normalized Counts---------------------------#
-#----------------------------Widget Count: 0----------------------------#
-#-----------------------Expected output Count: 0------------------------#
+#----------------------------Widget Count: 1----------------------------#
+#-----------------------Expected output Count: 2------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 tabPanel("Normalized Counts Transformation",
          fluidPage(
@@ -230,14 +232,37 @@ tabPanel("Normalized Counts Transformation",
          ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
        ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
+      ,
 
-
-
-
-
-
-
-
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 3----------------------------------#
+#-----------------------------PCA Plots---------------------------------#
+#---------------------------Widget Count: 0-----------------------------#
+#-----------------------Expected output Count: ------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+tabPanel("Principle Component Plots",
+         fluidPage(
+           sidebarLayout(
+             #______________________________Side Bar_________________________________#
+             
+             sidebarPanel(
+               
+               uiOutput('change_n')
+               
+             ), ##XX##~~~Side Panel End~~~##XX##
+             
+             #_____________________________Main Panel________________________________#
+             
+             mainPanel(      
+               
+                uiOutput('principle_component_plots')
+               
+               
+             )##XX##~~~Main Panel End~~~##XX##
+             
+           ) ##XX##~~~Side Bar Layout Closing Bracket~~~##XX##
+         ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
+       ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
 
 

@@ -9,9 +9,12 @@ source("Functions.R")
 library(crayon)
 library(DESeq2)
 library(ggplot2)
+library(ggplotify)
+library(patchwork)
 library(matrixStats)
 library(S4Vectors)
 library(SummarizedExperiment)
+library(pheatmap)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -195,7 +198,7 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 tabPanel("Normalized Counts Transformation",
          fluidPage(
-             #_____________________________Main Panel________________________________#
+#_____________________________Main Panel________________________________#
              
              mainPanel( 
                
@@ -235,35 +238,111 @@ tabPanel("Normalized Counts Transformation",
       ,
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#-------------------------------PAGE 3----------------------------------#
+#-------------------------------PAGE 4----------------------------------#
 #-----------------------------PCA Plots---------------------------------#
-#---------------------------Widget Count: 0-----------------------------#
-#-----------------------Expected output Count: ------------------------#
+#---------------------------Widget Count: 5-----------------------------#
+#-----------------------Expected output Count: 1------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 tabPanel("Principle Component Plots",
          fluidPage(
-           sidebarLayout(
-             #______________________________Side Bar_________________________________#
+#______________________________Side Bar_________________________________#
              
-             sidebarPanel(
+             sidebarPanel( width=2,
                
-               uiOutput('change_n')
+               HTML("<h3>Labels</h3>")    
+               
+               ,
+                           
+               textInput('title_pca_plot', 'Title', value = 'Title')
+               
+               ,
+               
+               textInput('subtitle_pca_plot', 'Sub Title', value = 'Sub Title')
+               
+               
+               ,
+               
+               textAreaInput('caption_pca_plot', 'Caption', value = 'caption', width=200, rows=3)
+               
+               ,
+               
+               textInput('legend_title_pca_plot', 'Legend Title', value = 'Condition')
                
              ), ##XX##~~~Side Panel End~~~##XX##
              
-             #_____________________________Main Panel________________________________#
+#_____________________________Main Panel________________________________#
              
-             mainPanel(      
+             mainPanel( width=7,     
                
-                uiOutput('principle_component_plots')
+                uiOutput('principle_component_plots_ui')
                
                
-             )##XX##~~~Main Panel End~~~##XX##
+             ),##XX##~~~Main Panel End~~~##XX##
              
-           ) ##XX##~~~Side Bar Layout Closing Bracket~~~##XX##
+#______________________________Side Bar_________________________________#
+             
+             sidebarPanel( width=3,
+              
+               HTML("<h3>Data</h3>")              
+               
+               ,
+              
+               uiOutput('change_n_pca_plot')
+               
+               
+             ), ##XX##~~~Side Panel End~~~##XX##
+             
          ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
        ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
+      ,
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 5----------------------------------#
+#-------------------------Correlation Analysis--------------------------#
+#---------------------------Widget Count: 0-----------------------------#
+#-----------------------Expected output Count: 0------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+tabPanel("Correlation Anaylsis",
+         fluidPage(
+#______________________________Side Bar_________________________________#
+           
+           sidebarPanel( width=2,
+             
+             HTML("<h3>Labels</h3>")    
+             
+             ,
+             
+             textInput('title_heatmap_plot', 'Title', value = 'Title')
+             
+             ,
+             
+             textInput('sub_title_heatmap_plot', 'Sub Title', value = 'Sub Title')
+             
+             
+             ,
+             
+             textAreaInput('caption_heatmap_pca_plot', 'Caption', value = 'caption', width=200, rows=3)
+             
+           ), ##XX##~~~Side Panel End~~~##XX##
+           
+#_____________________________Main Panel________________________________#
+           
+           mainPanel( width=7,     
+                      
+              uiOutput('heatmap_plots_ui')
+                      
+           ),##XX##~~~Main Panel End~~~##XX##
+           
+#______________________________Side Bar_________________________________#
+           
+           sidebarPanel( width=3,
+                         
+                         
+           ), ##XX##~~~Side Panel End~~~##XX##
+           
+         ) ##XX##~~~Fluid Page Closing Bracket~~~##XX## 
+      ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
 
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

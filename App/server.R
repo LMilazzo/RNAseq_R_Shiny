@@ -533,7 +533,8 @@ server <- function(input, output) {
               axis.line.y = element_blank(),
               plot.margin = margin(75, 15, 0, -5, "pt"),
               axis.text.x = element_text(color = "black", size = 15),
-              axis.title.x = element_text(size = 15),) 
+              axis.text.y = element_text(color = "black", size = 15),
+              axis.title.x = element_text(size = 15)) 
       
     })
   #UI for histogram display and title 
@@ -573,7 +574,6 @@ server <- function(input, output) {
       
       
       vst <- left_join(vst, gene_names()) %>% select(-gene_id)
-      print(head(vst))
       
       pvals <- results_ddsc() %>% mutate(gene_id = rownames(results_ddsc())) %>%
         left_join(gene_names()) %>% select(gene_name, padj)
@@ -607,7 +607,7 @@ server <- function(input, output) {
         size <- as.matrix(sizeFactors(ddsc()) %>% round(digits = 3))
         print(size)
         sF <- div(h4("Size Factors"), renderTable({t(size)}))
-      }else{print("error")}
+      }else{print("No Size Factors")}
       
       div(sF)
     }
@@ -619,35 +619,58 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-------principle_component_plots--------#
   #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
-  # A Simple PCA plot using plotPCA
+  # A ggplot using the pcaPlot data
   output$pca_plot1 <- renderPlot({
     if(is.null(vst_Obj())){return()}
     
-    plotPCA(vst_Obj(), intgroup=c('cond'), ntop=input$pca_nrow)
+    x <- plotPCA(vst_Obj(), intgroup=c('cond'), ntop=input$pca_nrow, returnData=TRUE)
+    percentVar <- round(100 * attr(x, "percentVar"))
     
+    ggplot(x, aes(x= PC1, y = PC2, color=cond))+
+      geom_point(size= 5) +
+      xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+      ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+      theme_minimal() + 
+      
+      labs(title = input$title_pca_plot, 
+           subtitle = input$subtitle_pca_plot, 
+           caption = input$caption_pca_plot,
+           color = input$legend_title_pca_plot) + 
+    
+      theme(plot.margin = margin(10, 10, 10, 10, "pt"),
+            axis.title.x = element_text(color='black', size = 20, margin = margin(15, 15, 15, 15, "pt")),
+            axis.title.y = element_text(color='black', size=20, margin = margin(15, 15, 15, 15, "pt")),
+            axis.text.y = element_text(color='black', size=15),
+            axis.text.x = element_text(color='black', size=15),
+            panel.grid.minor.y = element_blank(),
+            panel.grid.minor.x = element_blank(),
+            axis.line.x = element_line(color='grey'),
+            axis.line.y = element_line(color='grey'),
+            
+            legend.text = element_text(color='black', size=20),
+            legend.title = element_text(color='black', size=20),
+            legend.margin = margin(15, 15, 15, 15, "pt"),
+
+            plot.title = element_text(color='black', size=30, margin=margin(20,20,5,10,"pt")),
+            plot.subtitle = element_text(color='black', size=20, margin=margin(5,5,15,10,"pt")),
+            plot.caption = element_text(color='black', size=15, margin=margin(10, 10, 10, 10, "pt")),
+            
+            aspect.ratio = 1) +
+      coord_fixed()
   })
-  output$principle_component_plots <- renderUI({
-    
+  #Displayable ui for the pcaPlot
+  output$principle_component_plots_ui <- renderUI({
     if(is.null(vst_Obj())){
       return_ui <- span("No Data Yet",style="color: red;")
       return_ui
     }else{
-      
-      div(
         
-        HTML("<h4>Principle Component Analysis</h4>")
+        plotOutput('pca_plot1', height= "700px" ,width = "100%")
         
-        ,
-        
-        plotOutput('pca_plot1')
-        
-      )
     }
-    
-    
-    
   })
-  output$change_n <- renderUI({
+  #Change included genes widget
+  output$change_n_pca_plot <- renderUI({
     
     m <- 500
     
@@ -660,11 +683,90 @@ server <- function(input, output) {
     div(
       p("This number determines how many genes are included in the PCA ranked by variance."),
       p("If the default 500 is selected the top 500 genes with the most variance will be used."),
-      
+      p(paste("Max: ", m)),
+      p("Min: 2"),
       numericInput('pca_nrow', '', 
-                   value=500, min=250, max=m)
+                   value=500, min=2, max=m)
     )
   })
+  
+  
+  #______________________________Page 5____________________________#
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #-------------heat_map_plot--------------#
+  #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
+  #The heat map plot
+  output$heatmap_plot1 <- renderPlot({
+    if(is.null(vst_counts())){return()}
+    
+    vst <- vst_counts()
+    
+    vst_cor <- cor(vst)
+    
+    p <- pheatmap(vst_cor,
+             annotation_col = metaData(),  
+             annotation_names_col = FALSE,
+             show_rownames = TRUE,       
+             show_colnames = TRUE,
+             number_color = 'black',
+             fontsize = 20,
+             fontsize_col = 20,
+             fontsize_row = 20, 
+             fontsize_number = 12,
+             angle_col="45",
+             cellwidth = 70,
+             cellheight = 70,
+             treeheight_row = 50,
+             treeheight_col = 50,
+             silent= TRUE)
+    
+    p <- as.ggplot(p)
+    
+    p + 
+      labs(title = input$title_heatmap_plot, 
+           subtitle = input$sub_title_heatmap_plot, 
+           caption = input$caption_heatmap_pca_plot) +
+    
+      theme(
+        plot.margin = margin(25,75,30,10,"pt"),
+        
+        legend.text = element_text(color='black', size=20),
+        legend.title = element_text(color='black', size=20),
+        legend.margin = margin(15, 15, 15, 15, "pt"),
+        
+        plot.title = element_text(color='black', size=30, margin=margin(5,5,5,-45,"pt")),
+        plot.subtitle = element_text(color='black', size=20, margin=margin(5,5,65,-45,"pt")),
+        plot.caption = element_text(color='black', size=15, margin=margin(35, 10, 5, 10, "pt"), vjust=-0.5),
+        
+        aspect.ratio = 1
+      )
+  })
+  #The ui to display the heatmap plot
+  output$heatmap_plots_ui <- renderUI({
+    if(is.null(vst_counts())){
+      return_ui <- span("No Data Yet",style="color: red;")
+      return_ui
+    }else{
+      
+      fluidPage(
+          plotOutput('heatmap_plot1', height= "800px" ,width = "100%")
+        )
+      
+      
+      
+      
+    }
+  })
+  
+  
+  #______________________________Page 6____________________________#
+
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  #-------------gene_counts_search---------#
+  #~~~~~~~~~~~~~~~~ui~~~~~~~~~~~~~~~~~~~~~~#
+  #res_cond_data <- merge(as.data.frame(res_cond), as.data.frame(counts(ddsc, normalized=TRUE)), by="row.names", sort=FALSE)  
+  #is normalized different than vst
   
   
 }#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

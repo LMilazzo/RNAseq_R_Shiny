@@ -277,65 +277,78 @@ server <- function(input, output) {
     
      colNames <- colnames(data)
      
-     if(ncol(data) < 8){
+     possible_columns <- c("gene_id","gene_name","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
+     
+     common_columns <- intersect(possible_columns, colNames)
+    
+     #Required stuff
+     #Set geneID
+     if(! "gene_id" %in% common_columns){
        showModal(modalDialog(
-         tags$p(style = "color: red;","This file does not have the required data"), easyClose = TRUE, footer=NULL)
+         tags$p(style = "color: red;","Error: a gene id column is required with header gene_id"), easyClose = TRUE, footer=NULL)
        )
+       return()
+     }else{df <- data.frame(data %>% select(gene_id)) }
+     #Set gene names
+     if(! "gene_name" %in% common_columns){
+       showModal(modalDialog(
+         tags$p(style = "color: red;","Error: a gene name column is required with header gene_name"), easyClose = TRUE, footer=NULL)
+       )
+       return()
+     }else{df <- df %>% mutate(gene_name = data$gene_name)}
+     #set fold change
+     if(! "log2FoldChange" %in% common_columns){
+       showModal(modalDialog(
+         tags$p(style = "color: red;","Error: a fold change column is required with header log2FoldChange"), easyClose = TRUE, footer=NULL)
+       )
+       return()
+     }else{df <- df %>% mutate(log2FoldChange = data$log2FoldChange)}
+     #Set padj
+     if(! "padj" %in% common_columns){
+       showModal(modalDialog(
+         tags$p(style = "color: red;","Error: a padj column is required with header padj"), easyClose = TRUE, footer=NULL)
+       )
+       return()
+     }else{df <- df %>% mutate(padj = data$padj)}
+     
+     #Optional stuff
+     if("baseMean" %in% common_columns){df <- df %>% mutate(baseMean  = data$baseMean)}
+     if("lfcSE" %in% common_columns){df <- df %>% mutate(lfcSE = data$lfcSE)}
+     if("stat" %in% common_columns){df <- df %>% mutate(stat = data$stat)}
+     if("pvalue" %in% common_columns){df <- df %>% mutate(pvalue = data$pvalue)}
+    
+     gene_names(df[,2:1])
+    
+     df <- df %>% tibble::column_to_rownames('gene_id')
+     df <- df %>% select(-gene_name)
+     
+     results_ddsc(df)
+     
+     sample_columns <- data[,grep("^\\.", colnames(data), value = TRUE)]
+     
+     if(ncol(sample_columns) == 0){
+       showModal(modalDialog(
+         tags$p(style = "color: red;","Some features not available because of missing sample data"), easyClose = TRUE, footer=NULL))
        return()
      }
      
-     format_check <- c("gene_id","gene_name","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
-     
-     if(FALSE %in% (colNames[1:8] == format_check)){
+     if(! nrow(sample_columns) == nrow(gene_names())){
        showModal(modalDialog(
-         tags$p(style = "color: red;","This file may not have the correct format or data"), easyClose = TRUE, footer=NULL)
+         tags$p(style = "color: red;","Error: number of rows in the counts data != rows in gene names list"), easyClose = TRUE, footer=NULL)
        )
        return()
      }
+    
+     sample_counts <- sample_columns %>% 
+       mutate(gene_id = gene_names()$gene_id)%>%
+       tibble::column_to_rownames('gene_id')
      
-     if(ncol(data) < 9){
+     vst_counts(sample_counts)
+     
+     if(is.null(metaData())){
        showModal(modalDialog(
-         tags$p(style = "color: red;","There doesn't seem to be any variance stabalized counts in your file, without them you may lose access to some features"), easyClose = TRUE, footer=NULL)
-       )
-       
-       gene_names(data[,2:1])
-       
-       deg <- data[1:8]
-       
-       deg <- deg %>% select(-gene_name)
-       
-       deg <- deg %>% tibble::column_to_rownames('gene_id')
-       
-       results_ddsc(deg)
-       
-       return()
-       
-     }else{
-       
-       gene_names(data[,2:1])
-       
-       deg <- data[1:8]
-       
-       deg <- deg %>% select(-gene_name)
-       
-       deg <- deg %>% tibble::column_to_rownames('gene_id')
-       
-       results_ddsc(deg)
-       
-       sample_names <- colNames[9:ncol(data)]
-       sample_counts <- data.frame(data[,9:ncol(data)])
-       sample_counts <- sample_counts %>% 
-         mutate(gene_id = gene_names()$gene_id) %>% 
-         tibble::column_to_rownames('gene_id')
-       
-       vst_counts(sample_counts)
-       
-       if(is.null(metaData())){
-         showModal(modalDialog(
-           tags$p(style = "color: red;","For a full analysis it is recomended to return to page one and submit a proper meta data file"), easyClose = TRUE, footer=NULL))
-       }
-       return()
-    }
+         tags$p(style = "color: red;","For a full analysis it is recomended to return to page one and submit a proper meta data file"), easyClose = TRUE, footer=NULL))
+     }
   })
   #If metaData and the DEG analysis info has been uploaded than ddsc() object DESeq2 dataset, 
   #and a DESeqTransform object will take the place of vst_counts_VST_OBJECT
@@ -350,8 +363,23 @@ server <- function(input, output) {
     if(is.null(metaData())){return()}
     if(is.null(vst_counts())){return()}
 
-    vstcounts <- vst_counts()    
+   
+    if(nrow(metaData()) != ncol(vst_counts())){
+      showModal(modalDialog(
+        tags$p(style = "color: red;","Error: Number of samples in meta data is not the same as the number of samples in the counts data"), easyClose = TRUE, footer=NULL))
+      return()
+    }
+    
+    sample_names_in_metaData <- rownames(metaData())
   
+    vstcounts <- vst_counts()    
+    
+    colnames(vstcounts) <- sample_names_in_metaData
+    
+    vst_counts(vstcounts)
+    
+    vstcounts <- vst_counts()
+    
     coldata <- metaData()
     
     cond <- factor(coldata[,1])
@@ -386,6 +414,7 @@ server <- function(input, output) {
      if(is.null(results_ddsc())){
        return()
      }
+  
      func_return <- splitByExpr(results_ddsc(), gene_names(), input$cutOffs )
 
      up(data.frame(func_return[1]))
@@ -451,7 +480,15 @@ server <- function(input, output) {
   output$pg2_display_upload_DEG_data <- renderUI({
       
     if(is.null(kill_deg())){
-        widget <- fileInput("DEG_analysis_data", "Differential Expression data .tsv/.csv")
+        widget <- fileInput("DEG_analysis_data", 
+          div(
+            p("Differential Expression data .tsv/.csv"),
+            p("Required data is: an abitrary but unique gene_id column, a gene_name column, a log2FoldChange column, and an adjusted P-value columns"),
+            p("If you upload sample counts you MUST denote sample colums with sample names starting with ' . ' eg: ' .T96.s1 '"),
+            p("Sample names in meta data file should match the order of the sample columns in the DEG file, names do not have to match and will be overrided by the ones in the meta data file"),
+            p("Sample counts must be a variance stabalized transformation of your raw counts")
+          )
+        )
         widget
       }else{
         return()
@@ -481,9 +518,12 @@ server <- function(input, output) {
       
         p <- as.numeric(input$pvalue)
         
-        t1 <- up() %>% select(input$display_col, 'padj')
-        t2 <- down() %>% select(input$display_col, 'padj')
-        t3 <- noR() %>% select(input$display_col, 'padj')
+        present_columns <- colnames(up())
+        display_columns  <- intersect(present_columns, input$display_col)
+     
+        t1 <- up() %>% select('gene_name', display_columns, 'padj')
+        t2 <- down() %>% select('gene_name', display_columns, 'padj')
+        t3 <- noR() %>% select('gene_name', display_columns, 'padj')
         
         
         t1 <- t1 %>% filter(padj < as.numeric(input$pvalue))

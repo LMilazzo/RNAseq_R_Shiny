@@ -6,7 +6,6 @@ library(plyr)
 library(dplyr)
 library(readr)
 source("Functions.R")
-library(crayon)
 library(DESeq2)
 library(ggplot2)
 library(ggplotify)
@@ -149,13 +148,12 @@ ui <- navbarPage("DESeq2",
             ,
             
             checkboxGroupInput('display_col', 'Values of Interest (may take longer to load if more selected)', 
-                               c('Gene Name' = 'gene_name', 
-                               'Base Mean' = 'baseMean', 
+                               c('Base Mean' = 'baseMean', 
                                'Log2 Fold Change' ='log2FoldChange',
                                'lfcSE' ='lfcSE',
                                'Stat' ='stat',	
                                'P-Value' ='pvalue'),
-                               selected=c('gene_name','log2FoldChange'),
+                               selected=c('log2FoldChange'),
                                inline=FALSE)
             ,
             

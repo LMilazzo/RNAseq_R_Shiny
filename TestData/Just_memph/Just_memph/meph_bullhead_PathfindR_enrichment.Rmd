@@ -1,0 +1,452 @@
+---
+title: "Memphramegog only Enrichment analysis PathfindR"
+author: "Emily Curd"
+date: "2024-03-22"
+output: html_document
+---
+
+# Enrichment Analysis
+
+This analysis uses the R package: [pathfindR: An R Package for Enrichment Analysis Utilizing Active Subnetworks](https://github.com/egeulgen/pathfindR). 
+
+citation: Ulgen E, Ozisik O, Sezerman OU. 2019. pathfindR: An R Package for Comprehensive Identification of Enriched Pathways in Omics Data Through Active Subnetworks. Front. Genet. https://doi.org/10.3389/fgene.2019.00858
+
+The aim of PathfindR is to exploit interaction information to extract the most relevant pathways for enrichment analysis. This pathway analysis method identifies genes that are active in sub networks (known to be interconnected) of a given protein-protein interaction network (PIN). It then performs enrichment analysis for each active sub network. The identified pathways are then clustered for functionality to reduce the complexity of the analysis.  The overall activity of each pathway is scored and activity per sample can be estimated.
+
+PathfindR integrates information from differential expression/methylation, PIN via active subnetwork identification, and pathway/gene set annotation to identity the of the mechanisms driving a phenotype.
+
+This differs from commonly used over representation analysis and functional class scoring methods, which consider the number of genes identified in a gene list and do not take into account interaction information. They typically also ignore fold changes of p-values.
+
+
+
+# Analysis Steps (Summarizing the paper and github repo)
+
+## Input and format the dataset
+  * The input data is
+    * gene symbols
+      - e.g., Gene_symbol
+      - if a gene symbol is not in the chosen protein-protein interaction network (PIN), it is converted to an alias symbol if there is an appropriate alias symbol in the PIN
+    * change values (optional)
+      - e.g., logFC
+    * associated p-values
+      - e.g., adjPval
+
+## Map the statistical significance of each gene onto a PIN
+ * Input genes with associated p-values are mapped on to the PIN. 
+ * The mapped hits are used to search for active subnetworks.
+    * An active subnetwork is a subnetwork in the PIN containing an optimal number of significant nodes that maximizes the overall significance of the subnetwork
+    * Active subnetworks have genes/proteins in direct contact or in indirect contact via a non-input node
+  * Three algorithms implemented in the pathfindR package for active subnetwork search (see paper for details):
+    * Greedy algorithm (default - tends to result in multiple active subnetworks)
+    * Simulated annealing algorithm (tends to choose the single highest scoring active subnetwork)
+    * Genetic Algorithm (tends to choose the single highest scoring active subnetwork)
+      
+    
+## Filter the subnetwork 
+  * The identified active subnetworks are filtered by scores and numbers of significant genes.
+    * has a score larger than the given quantile threshold (default is 0.80) 
+    * contains at least a specified number of input genes (default is 10).
+
+## Run the enrichment analyses on active subnetworks
+  * Enrichment analysis is run on filtered lists of active subnetworks.
+    * Enrichment is performed via one-sided hypergeometric testing
+      - enrichment tests use only the genes in the PIN as background genes.
+    * significantly enriched terms are identified using the genes the active subnetworks
+      - enriched terms = pathways or gene sets
+    * Enriched terms are discarded if they have an adjusted p-values (default-Bonferroni method) > a given threshold are discarded
+    * The lowest lowest adjusted p-value for a term is kept (across all active subnetworks).
+    * Enrichment is run for n iterations in parallel.
+      - for each significantly enriched term, the lowest and the highest adjusted p-values, and the number of occurrences across iterations are reported.
+  * Pathway clustering
+    * Enrichment analysis usually recovers many related pathways.
+      - pathways are clustered (describes in the paper)
+        - hierarchical clustering (default) 
+        - fuzzy clustering method
+  * Pathway scoring
+    * a pathway score matrix is calculated for each sample.
+    * Scores can be plotted as a heat map
+  
+### Avalible PINs:
+“Biogrid”, “STRING”, “GeneMania”, “IntAct”, “KEGG” and “mmu_STRING”, custom
+
+###The available gene sets:
+“KEGG”, “Reactome”, “BioCarta”, “GO-All”, “GO-BP”, “GO-CC”, “GO-MF”, and “mmu_KEGG”, custom
+
+### Output columns
+
+Fold Enrichment: Fold enrichment value for the enriched term (Calculated using ONLY the input genes). This is calculated as the proportion of pathway genes within all INPUT (not subnetwork) genes over the proportion pathway genes within the background genes. For example, if the proportion of pathway genes in the input is 0.5 and the proportion of pathway genes in the background is 0.25, the fold enrichment value is 2. The background genes in pathfindR is used as all the genes in the protein-protein interaction network.
+
+occurence: the number of iterations that the given term was found to enriched over all iterations (as the active subnetwork search + enrichment processes are run for multiple (by default 10) iterations)
+
+support: the median support (proportion of active subnetworks leading to enrichment within an iteration) over all iterations. This reflects how many subnetworks support the enrichment
+
+lowest and highest p values: these are the lowest and highest adjusted-p values of enrichment observed over all iterations
+
+
+
+# Running PathfindR
+
+## Load libraries - silent loading
+```{r}
+
+suppressPackageStartupMessages({
+  
+library(tibble)
+library(plyr)
+#library(RColorBrewer)
+#library(pheatmap)
+#library(ggfortify)
+#library(DEqMS)
+library(readxl)
+library(tidyr)
+library(dplyr)
+#library(ggplot2)
+#library(fgsea)
+#library(RforProteomics)
+#library(ggrepel)
+library(pathfindR)
+
+})
+
+```
+
+
+## Set objects
+This chunk is only important if... you have abundance data - and its human
+```{r}
+# sample names - should match columns in file
+Col_list <- c("m_n_vt2_10","m_n_vt2_14","m_n_vt2_16","m_n_vt2_18","m_n_vt2_23","m_t_vt2_02","m_t_vt2_05","m_t_vt2_06","m_t_vt2_28","m_t_vt2_29R","m_t_vt2_30","m_t_vt2_32","m_t_vt2_37","m_t_vt2_40")
+
+# group identity for samples in Col_list
+grp <- c("n","n","n","n","n", "t","t","t","t","t","t","t","t","t" )
+
+# treatment group
+cases <- c("m_t_vt2_02","m_t_vt2_05","m_t_vt2_06","m_t_vt2_28","m_t_vt2_29R","m_t_vt2_30","m_t_vt2_32","m_t_vt2_37","m_t_vt2_40")
+
+```
+
+```{r}
+
+#path to file
+file <- "/Users/eguswa/Documents/R_markdown_with_expalinations/RNAseq/Bullhead_rnaseq/Just_memph/pathfindR/pathfinder_input.xlsx"
+
+
+#path for output - will make directory in location of R project - or where specified
+outdir <- "/Users/eguswa/Documents/R_markdown_with_expalinations/RNAseq/Bullhead_rnaseq/Just_memph/pathfindR/"
+
+
+
+# protein interaction network to run on the pathfindR differentially expressed protein dataset using the Protein Interaction Network (pin) of your choice:
+# "Biogrid", "STRING", "GeneMania", "IntAct", "KEGG", "mmu_STRING"
+
+pin <- "KEGG"
+
+gene_sets = "KEGG"
+
+# adjustment methods for pathfindF() pathway enrichment - options:
+# “holm”, “hochberg”, “hommel”, “bonferroni”, “BH”, “BY”, “fdr”, “none”"
+# default is bonferroni
+adj_method = "bonferroni"
+
+# enrichment threshold options for  pathfindF() pathway enrichment: 
+# adjusted-p value threshold used when filtering enrichment results (default = 0.05)
+enrichment_threshold = 0.05
+
+# several more options to play with
+
+# number of terms to show in first enrichment plot - will add more options for later plots
+top_terms <- 15
+
+```
+
+
+
+# Load files and make dataframes.
+The minimum requirement is that there is a column named Gene_Symbol and a column named P.value
+```{r}
+
+#make outdir
+dir.create(outdir, recursive = TRUE)
+
+df.prot <- read_excel(file)
+
+#if have abundance data
+
+dat <- df.prot %>% arrange((P.val)) %>% group_by(Gene_Symbol) %>% slice_head() %>% ungroup() %>%  select(Gene_Symbol, all_of(Col_list))  %>% drop_na() %>% column_to_rownames("Gene_Symbol")
+
+
+datPF <- df.prot  %>% select(Gene_Symbol, logFC, P.val) %>% arrange(P.val) %>%  group_by(Gene_Symbol) %>% slice_head() %>% drop_na() %>% ungroup()
+
+
+datPF <- as.data.frame(datPF)
+
+
+```
+
+
+
+## Convert the pathfindR Kegg gene database to a dataframe. 
+All PIN use Kegg gene database, b/c it is the default. The dataframe is used to add list of all genes in a pathway to the results table.
+```{r}
+kegg <- plyr::ldply(pathfindR.data::kegg_genes, data.frame) %>% mutate(num_genes_in_path = 1) %>% dplyr::group_by(.data$.id) %>% dplyr::summarize(X..i.. = paste0(.data$X..i.., collapse = ", "), num_genes_in_path = sum(num_genes_in_path)) 
+names(kegg)[1] <- "ID"
+names(kegg)[2] <- "all_pathway_genes"
+
+```
+
+
+# Run pathfindR 
+calculate percent of differentially expressed genes in a pathway and add to the results table
+adjustment methods “holm”, “hochberg”, “hommel”, “bonferroni”, “BH”, “BY”, “fdr”, “none”"
+
+* Fold Enrichment = percentage of genes in your list belonging to a pathway, divided by the corresponding percentage in the background PIN
+```{r}
+
+output_df_pin <- run_pathfindR(datPF, pin_name_path = pin,
+  adj_method = adj_method,
+  enrichment_threshold = enrichment_threshold,
+  iterations = 25, list_active_snw_genes=TRUE)
+
+output_df_pin <- left_join(output_df_pin, kegg)
+
+output_df_pin <- output_df_pin %>%
+   mutate(num_up_reg_genes_in_path = 1+lengths(regmatches(Up_regulated, gregexpr(",",Up_regulated ))))  %>%
+   mutate(num_down_reg_genes_in_path = 1+lengths(regmatches(Down_regulated, gregexpr(",",Down_regulated ))))  %>%
+   mutate(percent_up_or_down_genes_pathway = ((num_up_reg_genes_in_path + num_down_reg_genes_in_path) / num_genes_in_path))
+
+```
+ 
+## Visualize differentially expressed genes in Enriched pathways.  
+KEGG gives nice figures - might not reflect interactions as well as the others, other pins give networks of stuff - might be more concise
+```{r, eval=FALSE}
+
+if (pin == "KEGG"){
+  
+  print(paste0("Visualizing ", pin))
+  
+  processed_df <- input_processing(
+  input = datPF,
+  pin_name_path = pin
+  )
+
+  visualize_terms(
+  result_df=output_df_pin,
+  input_processed=processed_df,
+  hsa_KEGG = FALSE #TRUE if human
+  )
+  
+  
+  } else {
+  
+  print(paste0("Visualizing ", pin))
+  
+  visualize_terms(
+  result_df=output_df_pin,
+  input_processed=processed_df,
+  hsa_KEGG=FALSE,
+  pin_name_path=pin
+  )
+  
+  }
+
+  old_folder_name <- "term_visualizations" 
+  new_folder_name <- paste0(outdir,"/", pin,"_term_visualizations")
+  file.rename(old_folder_name, new_folder_name) 
+  
+
+```
+
+
+# Generate enrichment chart using the top_terms specified by user.
+```{r}
+#
+
+pdf(file = paste0(outdir,"/Enrichment_with_", pin, "_top_", top_terms, "_terms.pdf"))
+
+
+enrichment_chart(
+  result_df = output_df_pin,
+  top_terms = top_terms
+)
+dev.off()
+enrichment_chart(
+  result_df = output_df_pin,
+  top_terms = top_terms
+)
+```
+
+# Cluster enriched terms using defult method.
+```{r}
+
+
+pdf(file=(paste0(outdir,"/Enrichment_cluster_", pin,".pdf")))
+
+cluster_enriched_terms(output_df_pin, plot_dend = TRUE, plot_clusters_graph = TRUE)
+dev.off()
+
+output_pin_clustered <- cluster_enriched_terms(output_df_pin, plot_dend = TRUE, plot_clusters_graph = TRUE)
+
+
+```
+
+
+```{r}
+selected_clusters <- subset(output_pin_clustered, Cluster %in% 1:5)
+
+
+pdf(file = paste0(outdir,"/Enrichment_with_", pin, "_clusters_1-5.pdf"))
+
+enrichment_chart(selected_clusters, plot_by_cluster = TRUE)
+dev.off()
+
+enrichment_chart(selected_clusters, plot_by_cluster = TRUE)
+
+selected_clusters <- subset(output_pin_clustered, Cluster %in% 6:10)
+
+pdf(file = paste0(outdir,"/Enrichment_with_", pin, "_clusters_6-10.pdf"))
+enrichment_chart(selected_clusters, plot_by_cluster = TRUE)
+dev.off()
+
+enrichment_chart(selected_clusters, plot_by_cluster = TRUE)
+
+
+
+```
+
+
+# Make heatmap of enriched pathways vs differentially expressed genes
+```{r}
+pdf(file = paste0(outdir,"/Enrichment_heatmap_", pin, "_up_or_down_10_terms.pdf"))
+term_gene_heatmap(result_df = output_df_pin, num_terms = 10)
+dev.off()
+
+#pdf(file = paste0(outdir,"/Enrichment_heatmap_", pin, "_fold_change_10_terms.pdf"))
+#term_gene_heatmap(result_df = output_df_pin, genes_df = datPF, num_terms = 10)
+#dev.off()
+
+term_gene_heatmap(result_df = output_df_pin, num_terms = 10)
+
+#term_gene_heatmap(result_df = output_df_pin, genes_df = datPF, num_terms = 10)
+```
+
+# Term gene graph of top enriched terms.
+
+```{r}
+
+pdf(file=paste0(outdir,"/Enrichment_Term-Gene_Graph_", pin, "_top_5_terms.pdf"), width=11, height=8.5)
+
+term_gene_graph(result_df = output_df_pin, use_description = TRUE, num_terms = 5)
+dev.off()
+
+term_gene_graph(result_df = output_df_pin, use_description = TRUE, num_terms = 3)
+
+
+pdf(file=paste0(outdir,"/Enrichment_Term-Gene_Graph_", pin, "_top_10_terms.pdf"), width=11, height=8.5)
+term_gene_graph(result_df = output_df_pin, use_description = TRUE, num_terms = 10)
+dev.off()
+
+term_gene_graph(result_df = output_df_pin, use_description = TRUE, num_terms = 10)
+
+```
+
+# Make an UpSet heatmap of enriched pathways vs differentially expressed genes 
+
+```{r}
+
+pdf(file = paste0(outdir,"/Enrichment_UpSet_plot_", pin, "_up_or_down_10_terms.pdf"))
+UpSet_plot(result_df = output_df_pin)
+dev.off()
+
+pdf(file = paste0(outdir,"/Enrichment_UpSet_plot_", pin, "_fold_change_10_terms.pdf"))
+UpSet_plot(result_df = output_df_pin, genes_df = datPF, num_terms = 10)
+dev.off()
+
+UpSet_plot(result_df = output_df_pin)
+UpSet_plot(result_df = output_df_pin, genes_df = datPF, num_terms = 10)
+
+
+```
+# make a score matrix of enriched pathways by sample.
+
+"calculate the agglomerated z score of each enriched term per sample. This allows the user to individually examine the scores and infer how a term is overall altered (activated or repressed) in a given sample or a group of samples."
+
+```{r}
+
+representative_df <- output_pin_clustered[output_pin_clustered$Status == "Representative", ]
+
+representative_df <- as.data.frame(representative_df)
+
+dat.m <- as.matrix(dat)
+
+
+pdf(file=paste0(outdir,"/Enrichment_Score_Matrix_rep_terms_", pin, "_by_sample.pdf"))
+score_matrix <- score_terms(
+  enrichment_table = representative_df,
+  exp_mat = dat.m,
+  cases = cases,
+  use_description = TRUE, # default FALSE
+  label_samples = TRUE, # default = TRUE
+  #case_title = "R", # default = "Case"
+  #control_title = "", # default = "Control",
+  low = "#f7797d", # default = "green"
+  mid = "#fffde4", # default = "black"
+  high = "#1f4037" # default = "red"
+)
+dev.off()
+
+pdf(file=paste0(outdir,"/Enrichment_Score_Matrix_all_terms_", pin, "_by_sample.pdf"))
+score_matrix <- score_terms(
+  enrichment_table = output_pin_clustered,
+  exp_mat = dat.m,
+  cases=cases,
+  use_description = TRUE, # default FALSE
+  label_samples = TRUE, # default = TRUE
+  #case_title = "RA", # default = "Case"
+  #control_title = "Healthy", # default = "Control"
+  low = "#f7797d", # default = "green"
+  mid = "#fffde4", # default = "black"
+  high = "#1f4037" # default = "red"
+)
+dev.off()
+
+score_matrix <- score_terms(
+  enrichment_table = representative_df,
+  exp_mat = dat.m,
+  cases = cases,
+  use_description = TRUE, # default FALSE
+  label_samples = TRUE, # default = TRUE
+  #case_title = "R", # default = "Case"
+  #control_title = "", # default = "Control",
+  low = "#f7797d", # default = "green"
+  mid = "#fffde4", # default = "black"
+  high = "#1f4037" # default = "red"
+)
+
+
+  
+score_matrix <- score_terms(
+  enrichment_table = output_pin_clustered,
+  exp_mat = dat.m,
+  cases=cases,
+  use_description = TRUE, # default FALSE
+  label_samples = TRUE, # default = TRUE
+  #case_title = "RA", # default = "Case"
+  #control_title = "Healthy", # default = "Control"
+  low = "#f7797d", # default = "green"
+  mid = "#fffde4", # default = "black"
+  high = "#1f4037" # default = "red"
+)
+
+```
+
+
+# Save data!
+```{r}
+
+
+write.csv(output_pin_clustered, file=paste0(outdir,"/PathfindR_output_", pin, ".csv"))
+
+
+
+
+```

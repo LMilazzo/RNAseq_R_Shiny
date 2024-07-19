@@ -102,10 +102,6 @@ splitByExpr <- function(data, gene_names, cut){
   data <- left_join(data, gene_names) %>% select(-gene_id)
   
   
-  colOrder <- c('gene_name', 'baseMean', 'log2FoldChange', 'lfcSE', 'stat', 'pvalue', 'padj')
-  
-  data <- data[,colOrder]
-  
   res <- data.frame(data)
   
   up <- res %>% filter(log2FoldChange > upperBound)

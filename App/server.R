@@ -16,6 +16,7 @@ server <- function(input, output) {
   
   ddsc <- reactiveVal(NULL) #The Object DESeq2 
   results_ddsc <- reactiveVal(NULL) #Just a dataframe of results
+  normalized_counts <- reactiveVal(NULL) #normalized counts from the DESeq
   
   #Lists of regulated genes -0.5, 0.5 FoldChange cut off
   up <- reactiveVal(NULL)
@@ -352,7 +353,7 @@ server <- function(input, output) {
        mutate(gene_id = gene_names()$gene_id)%>%
        tibble::column_to_rownames('gene_id')
      
-     vst_counts(sample_counts)
+     normalized_counts(sample_counts)
      
      if(is.null(metaData())){
        showModal(modalDialog(
@@ -370,10 +371,10 @@ server <- function(input, output) {
     
     if(is.null(input$DEG_analysis_data)){return()}
     if(is.null(metaData())){return()}
-    if(is.null(vst_counts())){return()}
+    if(is.null(normalized_counts())){return()}
 
    
-    if(nrow(metaData()) != ncol(vst_counts())){
+    if(nrow(metaData()) != ncol(normalized_counts())){
       showModal(modalDialog(
         tags$p(style = "color: red;","Error: Number of samples in meta data is not the same as the number of samples in the counts data"), easyClose = TRUE, footer=NULL))
       return()
@@ -381,22 +382,22 @@ server <- function(input, output) {
     
     sample_names_in_metaData <- rownames(metaData())
   
-    vstcounts <- vst_counts()    
+    counts <- round(normalized_counts())    
     
-    colnames(vstcounts) <- sample_names_in_metaData
+    colnames(counts) <- sample_names_in_metaData
     
-    vst_counts(vstcounts)
+    print(class(counts))   
     
-    vstcounts <- vst_counts()
+    v <- varianceStabilizingTransformation(as.matrix(counts), blind=TRUE)
     
-    ddsc(NULL) # A deseq object is not even required we already have results
-    
-    se <- SummarizedExperiment(assays = list(counts = as.matrix(vstcounts)), colData = metaData())
-    
+    vst_counts(data.frame(v))
+
+    se <- SummarizedExperiment(assays = list(counts = v), colData = metaData())
+
     vsd <- DESeqTransform(se)
     
     vst_Obj(vsd)
-    
+   
   })
   
   
@@ -801,6 +802,7 @@ server <- function(input, output) {
     to_annotate <- intersect(colnames(metaData()), input$heatmap_cond)
     
     annotations <- lapply(to_annotate, function(col) {
+      
       HeatmapAnnotation(df = metaData()[, col, drop = FALSE], 
                         which = "col", 
                         annotation_name_side = "left",
@@ -809,8 +811,6 @@ server <- function(input, output) {
                         height = unit(1, 'cm')
                         )
     })
-    
-    print(annotations)
     
     # Combine annotations
     combined_annotations <- do.call(c, annotations)
@@ -843,8 +843,8 @@ server <- function(input, output) {
             column_names_centered = TRUE,
             column_names_gp = gpar(fontsize = 20, color='black'),
             
-            width = unit(18, "cm"), 
-            height = unit(18, "cm"),
+            # width = unit(18, "cm"), 
+            # height = unit(18, "cm"),
             
             border_gp = gpar(col = "black", lwd = 1),
             rect_gp = gpar(col = "black", lwd = 1),
@@ -863,6 +863,7 @@ server <- function(input, output) {
   })
   #The ui to display the heatmap plot
   output$heatmap_plots_ui <- renderUI({
+    
     if(is.null(vst_counts())){
       return_ui <- span("No Data Yet",style="color: red;")
       return_ui
@@ -873,7 +874,7 @@ server <- function(input, output) {
         )
     }
   })
-  
+  #UI for selecting annotations
   output$heatmap_annotations <- renderUI({
     
     div(
@@ -885,6 +886,7 @@ server <- function(input, output) {
     )
     
   })
+  
   
   
   #______________________________Page 6____________________________#

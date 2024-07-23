@@ -15,8 +15,7 @@ library(S4Vectors)
 library(SummarizedExperiment)
 library(ComplexHeatmap)
 library(grid)
-library(colourpicker)
-library(RColorBrewer)
+
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -363,11 +362,29 @@ tabPanel("Correlation Anaylsis",
               uiOutput('heatmap_annotations')
               #minimalize feature           
               
+              ,
+              
+              uiOutput('heatmap_annotation_colors')
+              
            ), ##XX##~~~Side Panel End~~~##XX##
            
          ) ##XX##~~~Fluid Page Closing Bracket~~~##XX## 
       ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
+      ,
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 6----------------------------------#
+#-------------------------Gene Search-----------------------------------#
+#---------------------------Widget Count: 0-----------------------------#
+#-----------------------Expected output Count: 0------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+tabPanel("Gene Search",
+         fluidPage(
+          
+           
+         ) ##XX##~~~Fluid Page Closing Bracket~~~##XX## 
+) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
    

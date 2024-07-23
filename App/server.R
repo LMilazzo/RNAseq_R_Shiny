@@ -124,11 +124,19 @@ server <- function(input, output) {
         return()
       }
       
-      cond <- md[,2]
+      coldata <- data.frame(md[,2:ncol(md)])
       
-      coldata <- data.frame(cond)
+      for (i in ncol(coldata)) {
+        coldata[,i] <- as.factor(coldata[,i])
+      }
       
       rownames(coldata) <- md[,1]
+      
+      colN <- colnames(md)[-1]
+      
+      colnames(coldata) <- colN
+      
+      print(coldata)
       
       metaData(coldata)
     })
@@ -205,15 +213,15 @@ server <- function(input, output) {
         
         coldata <- metaData()
         
-        cond <- as.factor(coldata$cond)
+        condition <- coldata$condition
         
         print(head(filtered_counts()))
         print(coldata)
-        print(cond)
+        print(condition)
         
         ddsc <- DESeqDataSetFromMatrix(countData = round(filtered_counts()), 
                                     colData = coldata, 
-                                    design = ~ cond)
+                                    design = ~ condition)
         
         showModal(modalDialog("Running DESeq...", footer=NULL))
         
@@ -280,7 +288,7 @@ server <- function(input, output) {
      possible_columns <- c("gene_id","gene_name","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
      
      common_columns <- intersect(possible_columns, colNames)
-    
+
      #Required stuff
      #Set geneID
      if(! "gene_id" %in% common_columns){
@@ -317,6 +325,7 @@ server <- function(input, output) {
      if("stat" %in% common_columns){df <- df %>% mutate(stat = data$stat)}
      if("pvalue" %in% common_columns){df <- df %>% mutate(pvalue = data$pvalue)}
     
+     
      gene_names(df[,2:1])
     
      df <- df %>% tibble::column_to_rownames('gene_id')
@@ -380,18 +389,9 @@ server <- function(input, output) {
     
     vstcounts <- vst_counts()
     
-    coldata <- metaData()
+    ddsc(NULL) # A deseq object is not even required we already have results
     
-    cond <- factor(coldata[,1])
-    
-    coldata <- data.frame(coldata)
-    coldata$cond <- cond
-    
-    dds <- DESeqDataSetFromMatrix(countData = as.matrix(round(vstcounts)), colData = coldata, design = ~ cond)
-    
-    ddsc(dds)
-    
-    se <- SummarizedExperiment(assays = list(counts = as.matrix(vstcounts)), colData = coldata)
+    se <- SummarizedExperiment(assays = list(counts = as.matrix(vstcounts)), colData = metaData())
     
     vsd <- DESeqTransform(se)
     
@@ -661,22 +661,44 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
   # A ggplot using the pcaPlot data
   output$pca_plot1 <- renderPlot({
+    
     if(is.null(vst_Obj())){return()}
     
-    x <- plotPCA(vst_Obj(), intgroup=c('cond'), ntop=input$pca_nrow, returnData=TRUE)
-    percentVar <- round(100 * attr(x, "percentVar"))
+    if(is.null(input$pca_cond)){return()}
     
-    ggplot(x, aes(x= PC1, y = PC2, color=cond))+
-      geom_point(size= 5) +
+    pca_data <- plotPCA(vst_Obj(), intgroup=input$pca_cond, ntop=input$pca_nrow, returnData=TRUE)
+    
+    percentVar <- round(100 * attr(pca_data, "percentVar"))
+    
+    aesthetics <- aes(x = pca_data$PC1, y = pca_data$PC2 )
+    
+    x <- length(input$pca_cond)
+   
+    if(x >= 1){
+      aesthetics$colour = as.name(input$pca_cond[1])
+    }
+    if(x >= 2){
+      aesthetics$shape = as.name(input$pca_cond[2])
+    }
+    if(x >= 3){
+      aesthetics$size = as.name(input$pca_cond[3])
+    }
+    
+    pca_plot <- ggplot(pca_data,aesthetics)+
+      
       xlab(paste0("PC1: ", percentVar[1], "% variance")) +
       ylab(paste0("PC2: ", percentVar[2], "% variance")) +
-      theme_minimal() + 
       
-      labs(title = input$title_pca_plot, 
-           subtitle = input$subtitle_pca_plot, 
+      theme_minimal() +
+
+      labs(title = input$title_pca_plot,
+           subtitle = input$subtitle_pca_plot,
            caption = input$caption_pca_plot,
-           color = input$legend_title_pca_plot) + 
-    
+           color = if (x >= 1) input$pca_cond[1] else NULL,
+           shape = if (x >= 2) input$pca_cond[2] else NULL,
+           size = if (x >= 3) input$pca_cond[3] else NULL
+           ) +
+
       theme(plot.margin = margin(10, 10, 10, 10, "pt"),
             axis.title.x = element_text(color='black', size = 20, margin = margin(15, 15, 15, 15, "pt")),
             axis.title.y = element_text(color='black', size=20, margin = margin(15, 15, 15, 15, "pt")),
@@ -686,7 +708,7 @@ server <- function(input, output) {
             panel.grid.minor.x = element_blank(),
             axis.line.x = element_line(color='grey'),
             axis.line.y = element_line(color='grey'),
-            
+
             legend.text = element_text(color='black', size=20),
             legend.title = element_text(color='black', size=20),
             legend.margin = margin(15, 15, 15, 15, "pt"),
@@ -694,9 +716,20 @@ server <- function(input, output) {
             plot.title = element_text(color='black', size=30, margin=margin(20,20,5,10,"pt")),
             plot.subtitle = element_text(color='black', size=20, margin=margin(5,5,15,10,"pt")),
             plot.caption = element_text(color='black', size=15, margin=margin(10, 10, 10, 10, "pt")),
-            
+
             aspect.ratio = 1) +
+        
       coord_fixed()
+
+    #Change size scale according to present number of variables
+    if(x >= 3){
+      pca_plot <- pca_plot + scale_size_discrete(range = c(3, 10)) + geom_point()
+    }else{
+      pca_plot <- pca_plot + geom_point(size=4)
+    }
+    
+    pca_plot
+    
   })
   #Displayable ui for the pcaPlot
   output$principle_component_plots_ui <- renderUI({
@@ -713,11 +746,18 @@ server <- function(input, output) {
   output$change_n_pca_plot <- renderUI({
     
     m <- 500
+    start <- 0
     
     if(is.null(vst_counts())){
       m <- 500
+      start <- 500
     }else{
       m <- nrow(vst_counts())
+      if(nrow(vst_counts()) >= 500){
+        start <- 500
+      }else(
+        start <- m
+      )
     }
     
     div(
@@ -726,8 +766,22 @@ server <- function(input, output) {
       p(paste("Max: ", m)),
       p("Min: 2"),
       numericInput('pca_nrow', '', 
-                   value=500, min=2, max=m)
+                   value=start, min=2, max=m)
     )
+  })
+  #Change the metadata columns that should be included in the pcaPlot
+  output$change_mColumns_for_pca <- renderUI({
+    
+    div(
+      
+      checkboxGroupInput('pca_cond', 'Meta data conditions to view', 
+                       choices=colnames(metaData()),
+                       selected=colnames(metaData()),
+                       inline=FALSE)
+    
+    )
+    
+    
   })
   
   
@@ -744,43 +798,68 @@ server <- function(input, output) {
     
     vst_cor <- cor(vst)
     
-    p <- pheatmap(vst_cor,
-             annotation_col = metaData(),  
-             annotation_names_col = FALSE,
-             show_rownames = TRUE,       
-             show_colnames = TRUE,
-             number_color = 'black',
-             fontsize = 20,
-             fontsize_col = 20,
-             fontsize_row = 20, 
-             fontsize_number = 12,
-             angle_col="45",
-             cellwidth = 70,
-             cellheight = 70,
-             treeheight_row = 50,
-             treeheight_col = 50,
-             silent= TRUE)
+    to_annotate <- intersect(colnames(metaData()), input$heatmap_cond)
     
-    p <- as.ggplot(p)
+    annotations <- lapply(to_annotate, function(col) {
+      HeatmapAnnotation(df = metaData()[, col, drop = FALSE], 
+                        which = "col", 
+                        annotation_name_side = "left",
+                        annotation_name_gp = gpar(fontsize = 17, color='black'),
+                        gap = unit(1, 'cm'),
+                        height = unit(1, 'cm')
+                        )
+    })
     
-    p + 
-      labs(title = input$title_heatmap_plot, 
-           subtitle = input$sub_title_heatmap_plot, 
-           caption = input$caption_heatmap_pca_plot) +
+    print(annotations)
     
-      theme(
-        plot.margin = margin(25,75,30,10,"pt"),
-        
-        legend.text = element_text(color='black', size=20),
-        legend.title = element_text(color='black', size=20),
-        legend.margin = margin(15, 15, 15, 15, "pt"),
-        
-        plot.title = element_text(color='black', size=30, margin=margin(5,5,5,-45,"pt")),
-        plot.subtitle = element_text(color='black', size=20, margin=margin(5,5,65,-45,"pt")),
-        plot.caption = element_text(color='black', size=15, margin=margin(35, 10, 5, 10, "pt"), vjust=-0.5),
-        
-        aspect.ratio = 1
-      )
+    # Combine annotations
+    combined_annotations <- do.call(c, annotations)
+    
+    x <- Heatmap(vst_cor,
+            name = "Value",
+            
+            top_annotation = combined_annotations,
+            
+            column_title = input$title_heatmap_plot,
+            column_title_gp = gpar(fontsize=25, color='black'),
+            
+            cluster_rows = TRUE,
+            row_dend_side = "right",
+            cluster_columns = TRUE,
+            
+            row_dend_gp = gpar(color='black', lwd = 2.25 ),
+            column_dend_gp = gpar(color='black', lwd = 2.25),
+            row_dend_width = unit(2.25, 'cm'),
+            column_dend_height = unit(2.25, 'cm'),
+            
+            
+            show_row_names = TRUE,
+            row_names_side = "left",
+            row_names_gp = gpar(fontsize = 20, color='black'),
+            
+            show_column_names = TRUE, 
+            column_names_side = "bottom",
+            column_names_rot = 45,
+            column_names_centered = TRUE,
+            column_names_gp = gpar(fontsize = 20, color='black'),
+            
+            width = unit(18, "cm"), 
+            height = unit(18, "cm"),
+            
+            border_gp = gpar(col = "black", lwd = 1),
+            rect_gp = gpar(col = "black", lwd = 1),
+            
+            heatmap_legend_param = list(
+              title_gp = gpar(fontsize=23, color='black'),
+              title_position = 'topleft',
+              labels_gp = gpar(fontsize=18, color='black'),
+              legend_height = unit(6, "cm")
+            )
+    )
+    
+    draw(x)
+    
+   
   })
   #The ui to display the heatmap plot
   output$heatmap_plots_ui <- renderUI({
@@ -792,11 +871,19 @@ server <- function(input, output) {
       fluidPage(
           plotOutput('heatmap_plot1', height= "800px" ,width = "100%")
         )
-      
-      
-      
-      
     }
+  })
+  
+  output$heatmap_annotations <- renderUI({
+    
+    div(
+      
+      checkboxGroupInput('heatmap_cond', 'Meta data conditions to view', 
+                         choices=colnames(metaData()),
+                         selected=colnames(metaData()),
+                         inline=FALSE)
+    )
+    
   })
   
   

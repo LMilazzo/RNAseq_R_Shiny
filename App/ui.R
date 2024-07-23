@@ -13,7 +13,10 @@ library(patchwork)
 library(matrixStats)
 library(S4Vectors)
 library(SummarizedExperiment)
-library(pheatmap)
+library(ComplexHeatmap)
+library(grid)
+library(colourpicker)
+library(RColorBrewer)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -250,21 +253,26 @@ tabPanel("Principle Component Plots",
                HTML("<h3>Labels</h3>")    
                
                ,
-                           
+               
+               #-----------------input----------------#
+               #----------------Title-----------------#
+               #--------------------------------------#           
                textInput('title_pca_plot', 'Title', value = 'Title')
                
                ,
                
+               #-----------------input----------------#
+               #----------------subTitle--------------#
+               #--------------------------------------#
                textInput('subtitle_pca_plot', 'Sub Title', value = 'Sub Title')
                
                
                ,
                
+               #-----------------input----------------#
+               #----------------caption---------------#
+               #--------------------------------------#
                textAreaInput('caption_pca_plot', 'Caption', value = 'caption', width=200, rows=3)
-               
-               ,
-               
-               textInput('legend_title_pca_plot', 'Legend Title', value = 'Condition')
                
              ), ##XX##~~~Side Panel End~~~##XX##
              
@@ -272,6 +280,10 @@ tabPanel("Principle Component Plots",
              
              mainPanel( width=7,     
                
+                #-----------------output---------------#
+                #----------------pca_plot--------------#
+                #--------------------------------------#
+                ##Principle component Analysis plot
                 uiOutput('principle_component_plots_ui')
                
                
@@ -284,9 +296,21 @@ tabPanel("Principle Component Plots",
                HTML("<h3>Data</h3>")              
                
                ,
-              
+               
+               #-----------------input----------------#
+               #----# of things included in pca-------#
+               #--------------------------------------#
+               #The number of things with top variance included in pca
                uiOutput('change_n_pca_plot')
                
+               ,
+               
+               #-----------------input----------------#
+               #-------columns shown in pca-----------#
+               #--------------------------------------#
+               # a Check box group of each column in the metaData()
+               # Selected on makes it included in the pca up to three
+               uiOutput('change_mColumns_for_pca')
                
              ), ##XX##~~~Side Panel End~~~##XX##
              
@@ -315,12 +339,12 @@ tabPanel("Correlation Anaylsis",
              
              ,
              
-             textInput('sub_title_heatmap_plot', 'Sub Title', value = 'Sub Title')
+             textInput('subtitle_heatmap_plot', 'Sub Title', value = 'Sub Title')
              
              
              ,
              
-             textAreaInput('caption_heatmap_pca_plot', 'Caption', value = 'caption', width=200, rows=3)
+             textAreaInput('caption_heatmap_plot', 'Caption', value = 'caption', width=200, rows=3)
              
            ), ##XX##~~~Side Panel End~~~##XX##
            
@@ -335,8 +359,10 @@ tabPanel("Correlation Anaylsis",
 #______________________________Side Bar_________________________________#
            
            sidebarPanel( width=3,
-                         
-                         
+              
+              uiOutput('heatmap_annotations')
+              #minimalize feature           
+              
            ), ##XX##~~~Side Panel End~~~##XX##
            
          ) ##XX##~~~Fluid Page Closing Bracket~~~##XX## 

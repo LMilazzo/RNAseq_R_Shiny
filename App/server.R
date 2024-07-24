@@ -843,8 +843,8 @@ server <- function(input, output) {
             column_names_centered = TRUE,
             column_names_gp = gpar(fontsize = 20, color='black'),
             
-            # width = unit(18, "cm"), 
-            # height = unit(18, "cm"),
+            width = unit(18, "cm"), 
+            height = unit(18, "cm"),
             
             border_gp = gpar(col = "black", lwd = 1),
             rect_gp = gpar(col = "black", lwd = 1),

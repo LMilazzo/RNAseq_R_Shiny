@@ -25,7 +25,6 @@ server <- function(input, output) {
   
   vst_Obj <- reactiveVal(NULL) #variance stabalized counts OBJECT
   vst_counts <- reactiveVal(NULL)#variance stabalized counts
-
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -71,10 +70,10 @@ server <- function(input, output) {
         return()
       }
       
-      raw_counts(data.frame(func_return[1]))
-      gene_names(data.frame(func_return[2]))
+      raw_counts(data.frame(func_return[1]))##################################################Reactive Assignment
+      gene_names(data.frame(func_return[2]))##################################################Reactive Assignment
       
-      filtered_counts( filterCounts(raw_counts()))
+      filtered_counts( filterCounts(raw_counts()))##################################################Reactive Assignment
       
       diff <- nrow( raw_counts() ) - nrow( filtered_counts() )
       
@@ -139,7 +138,7 @@ server <- function(input, output) {
       
       print(coldata)
       
-      metaData(coldata)
+      metaData(coldata)##################################################Reactive Assignment
     })
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -183,7 +182,7 @@ server <- function(input, output) {
     })
   # Cancels the modal and does not run DESeq if cancel button is selected
   observeEvent(input$cancel,{
-    run_question(NULL)
+    run_question(NULL)##################################################Reactive Assignment
     removeModal()
   }) 
   # Sets the run_question() object to true if selected 
@@ -193,8 +192,8 @@ server <- function(input, output) {
   # Sets kill_DEG() to TRUE to remove the option on page 2 for uploaded DEG results and starting 
   # from there
   observeEvent(input$run,{
-    run_question(TRUE)
-    kill_deg(TRUE)
+    run_question(TRUE)##################################################Reactive Assignment
+    kill_deg(TRUE)##################################################Reactive Assignment
     removeModal()
   })
   # Runs DESeq 2 upon input of input$run with mostly default parameters and single 
@@ -228,17 +227,18 @@ server <- function(input, output) {
         
         d <- DESeq(ddsc)
         
-        ddsc(d)
+        ddsc(d)##################################################Reactive Assignment
         
-        results_ddsc(data.frame(results(ddsc())))
+        results_ddsc(data.frame(results(ddsc())))##################################################Reactive Assignment
         
         showModal(modalDialog("Done!!", easyClose=TRUE, footer=NULL))
         
         removeModal()
        
         Cvst <- vst(ddsc(), blind=TRUE)
-        vst_counts(data.frame(assay(Cvst)))
-        vst_Obj(Cvst)
+        normalized_counts(data.frame(counts(ddsc(), normalized=TRUE)))##################################################Reactive Assignment
+        vst_counts(data.frame(assay(Cvst)))##################################################Reactive Assignment
+        vst_Obj(Cvst)##################################################Reactive Assignment
         
       }else{
         return()
@@ -327,12 +327,12 @@ server <- function(input, output) {
      if("pvalue" %in% common_columns){df <- df %>% mutate(pvalue = data$pvalue)}
     
      
-     gene_names(df[,2:1])
+     gene_names(df[,2:1])##################################################Reactive Assignment
     
      df <- df %>% tibble::column_to_rownames('gene_id')
      df <- df %>% select(-gene_name)
      
-     results_ddsc(df)
+     results_ddsc(df)##################################################Reactive Assignment
      
      sample_columns <- data[,grep("^\\.", colnames(data), value = TRUE)]
      
@@ -353,7 +353,7 @@ server <- function(input, output) {
        mutate(gene_id = gene_names()$gene_id)%>%
        tibble::column_to_rownames('gene_id')
      
-     normalized_counts(sample_counts)
+     normalized_counts(sample_counts)##################################################Reactive Assignment
      
      if(is.null(metaData())){
        showModal(modalDialog(
@@ -367,7 +367,7 @@ server <- function(input, output) {
   #normilization, due to this the size factors are not available for display), 
   #you may use plotPCA to plot principle components which is the primary use of the vst_counts
   # ALL other visuals volcano and counts plots do not require this specific object.
-  observeEvent(list(metaData(), input$DEG_analysis_data), {
+  observeEvent(list(metaData(), input$DEG_analysis_data),{
     
     if(is.null(input$DEG_analysis_data)){return()}
     if(is.null(metaData())){return()}
@@ -386,21 +386,18 @@ server <- function(input, output) {
     
     colnames(counts) <- sample_names_in_metaData
     
-    print(class(counts))   
-    
     v <- varianceStabilizingTransformation(as.matrix(counts), blind=TRUE)
     
-    vst_counts(data.frame(v))
+    vst_counts(data.frame(v))##################################################Reactive Assignment
 
     se <- SummarizedExperiment(assays = list(counts = v), colData = metaData())
 
     vsd <- DESeqTransform(se)
     
-    vst_Obj(vsd)
+    vst_Obj(vsd)##################################################Reactive Assignment
    
   })
-  
-  
+
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #---Observe Value Event-----# ----> results_ddsc()
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
@@ -423,8 +420,8 @@ server <- function(input, output) {
      noR(data.frame(func_return[3]))
      
    })
-  
-  
+
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -594,38 +591,38 @@ server <- function(input, output) {
         )
     })
   
-  #______________________________Page 3____________________________#
+#______________________________Page 3____________________________#
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-------vst_counts_PreviewTable----------#
   #~~~~~~~~~~~~~~~~dataTable~~~~~~~~~~~~~~~#
   # A DataTable with the variance stabilized transformation of the counts
-  output$vst_counts_PreviewTable <- renderUI({
+  output$normalized_counts_PreviewTable <- renderUI({
     
     return_ui <- NULL
     
-    if(is.null(vst_counts())){
+    if(is.null(normalized_counts())){
       return_ui <- p(span("No Data Yet",style="color: red;"))
       return_ui
     }else{
     
-      vst <- vst_counts() %>% round(digits = 4)
+      normalized <- normalized_counts() %>% round(digits = 4)
       
-      vst <- vst %>% mutate(gene_id = rownames(vst_counts()))
+      normalized <- normalized %>% mutate(gene_id = rownames(normalized_counts()))
       
       
-      vst <- left_join(vst, gene_names()) %>% select(-gene_id)
+      normalized <- left_join(normalized, gene_names()) %>% select(-gene_id)
       
       pvals <- results_ddsc() %>% mutate(gene_id = rownames(results_ddsc())) %>%
         left_join(gene_names()) %>% select(gene_name, padj)
       
-      vst <- left_join(vst, pvals, relationship="many-to-many") 
+      normalized <- left_join(normalized, pvals, relationship="many-to-many") 
       
-      vst <- vst %>% filter(padj < as.numeric(input$pvaluePg3))
+      normalized <- normalized %>% filter(padj < as.numeric(input$pvaluePg3))
       
-      vst <- vst[order(vst$padj),c((ncol(vst) - 1), ncol(vst), 1:(ncol(vst) - 2))]
+      normalized <- normalized[order(normalized$padj),c((ncol(normalized) - 1), ncol(normalized), 1:(ncol(normalized) - 2))]
       
-      return_ui <- datatable(vst, rownames=FALSE, options = list(pageLength=15))
+      return_ui <- datatable(normalized, rownames=FALSE, options = list(pageLength=15))
       
       return_ui
       
@@ -636,9 +633,9 @@ server <- function(input, output) {
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #----------Extra_vst_count_info----------# #Size factors only right now
   #~~~~~~~~~~~~~~~~UI output~~~~~~~~~~~~~~~#
-  output$Extra_vst_count_info <- renderUI({
+  output$Extra_normalized_count_info <- renderUI({
     
-    if(is.null(vst_counts())){
+    if(is.null(normalized_counts())){
       return_ui <- p(span("No Data Yet",style="color: red;"))
       return_ui
     }else{
@@ -648,14 +645,14 @@ server <- function(input, output) {
         size <- as.matrix(sizeFactors(ddsc()) %>% round(digits = 3))
         print(size)
         sF <- div(h4("Size Factors"), renderTable({t(size)}))
-      }else{print("No Size Factors")}
+      }else{print("No Size Factors for pre-normalized data")}
       
       div(sF)
     }
     
   })
   
-  #______________________________Page 4____________________________#
+#______________________________Page 4____________________________#
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-------principle_component_plots--------#
@@ -779,49 +776,94 @@ server <- function(input, output) {
                        choices=colnames(metaData()),
                        selected=colnames(metaData()),
                        inline=FALSE)
-    
     )
     
     
   })
   
   
-  #______________________________Page 5____________________________#
+#______________________________Page 5____________________________#
   
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-------------heat_map_plot--------------#
   #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
+  
   #The heat map plot
   output$heatmap_plot1 <- renderPlot({
     if(is.null(vst_counts())){return()}
+      
+    vst_cor <- cor(vst_counts())
     
-    vst <- vst_counts()
-    
-    vst_cor <- cor(vst)
-    
+    #annotations
     to_annotate <- intersect(colnames(metaData()), input$heatmap_cond)
     
-    annotations <- lapply(to_annotate, function(col) {
+    annotations <- lapply(to_annotate, function(an) {
       
-      HeatmapAnnotation(df = metaData()[, col, drop = FALSE], 
+      selected_color <- colorRampPalette(c(input[[paste0("color1_", an)]], 
+                                            input[[paste0("color2_", an)]]))(nlevels(factor(metaData()[[an]])))
+     
+      selected_color <- setNames(selected_color, levels(factor(metaData()[[an]])))
+        
+      HeatmapAnnotation(df = metaData()[, an, drop = FALSE], 
                         which = "col", 
                         annotation_name_side = "left",
                         annotation_name_gp = gpar(fontsize = 17, color='black'),
                         gap = unit(1, 'cm'),
-                        height = unit(1, 'cm')
+                        height = unit(1, 'cm'),
+                        col = setNames(list(selected_color), an),
+                        show_legend = FALSE
                         )
     })
     
-    # Combine annotations
     combined_annotations <- do.call(c, annotations)
+    
+    legends <- lapply(to_annotate, function(an) {
+      selected_color <- colorRampPalette(c(input[[paste0("color1_", an)]], 
+                                           input[[paste0("color2_", an)]]))(nlevels(factor(metaData()[[an]])))
+      
+      selected_color <- setNames(selected_color, levels(factor(metaData()[[an]])))
+      
+      Legend(at = levels(factor(metaData()[[an]])),
+             labels = levels(factor(metaData()[[an]])),
+             legend_gp = gpar(fill = selected_color),
+             title = an,
+             title_gp = gpar(fontsize = 17,  col = 'black'),
+             labels_gp = gpar(fontsize = 17, col = 'black'),
+             ncol = 3,
+             direction = "horizontal",
+             grid_width = unit(1, "cm"),
+             grid_height = unit(0.5,"cm")
+      )
+      
+    })
+    
+    #Colors Body
+    col_fun <- colorRamp2(c(0.92,1), c('white','black'))
+    
+    l <- NULL
+    if(input$heat_body_color == "blue-red"){
+      breaks <- c(0.92, 0.95, 0.97, 0.975, 0.98, 0.985, 0.99, 0.995, 1)
+      colors <- c("#003366", "#336699", "#6699cc", "#ffff99", "#ffe066", "#ffcc33", "#ff9933", "#ff6666", "#cc0000")
+      col_fun <- colorRamp2(breaks, colors)
+      
+    }else if(input$heat_body_color == "REV-Rainbow"){
+      col_fun <- colorRamp2(c(0.86, 0.90, 0.925, 0.935, 0.945, 0.955, 0.965, 0.975, 0.98, 0.985, 0.99, 0.995, 1), rev(rainbow(13)))
+      l <- Legend(col_fun = col_fun, title_gp = gpar(fontsize = 20,  col = 'black'),
+                  labels_gp = gpar(fontsize = 20, col = 'black'),legend_height = unit(6, "cm"), grid_width=unit(1,"cm"),
+                  at = c(0.90, 0.925, 0.935, 0.945, 0.955, 0.965, 0.975, 0.98, 0.985, 0.99, 0.995, 1),
+                  title_gap = unit(0.4, "cm"))
+      
+    }else if(input$heat_body_color == "white-black"){
+      breaks <- c(0.94, 0.96, 0.975, 0.980,0.990,0.995, 1)
+      colors <- c('white','lightgrey','grey50','ivory4','lavenderblush4', 'grey25', 'black')
+      col_fun <- colorRamp2(breaks, colors)
+    }
     
     x <- Heatmap(vst_cor,
             name = "Value",
-            
+            col=col_fun,
+
             top_annotation = combined_annotations,
-            
-            column_title = input$title_heatmap_plot,
-            column_title_gp = gpar(fontsize=25, color='black'),
             
             cluster_rows = TRUE,
             row_dend_side = "right",
@@ -829,8 +871,8 @@ server <- function(input, output) {
             
             row_dend_gp = gpar(color='black', lwd = 2.25 ),
             column_dend_gp = gpar(color='black', lwd = 2.25),
-            row_dend_width = unit(2.25, 'cm'),
-            column_dend_height = unit(2.25, 'cm'),
+            row_dend_width = unit(1.5, 'cm'),
+            column_dend_height = unit(1.5, 'cm'),
             
             
             show_row_names = TRUE,
@@ -840,26 +882,48 @@ server <- function(input, output) {
             show_column_names = TRUE, 
             column_names_side = "bottom",
             column_names_rot = 45,
-            column_names_centered = TRUE,
             column_names_gp = gpar(fontsize = 20, color='black'),
             
-            width = unit(18, "cm"), 
+            width = unit(0.7, "npc"),
             height = unit(18, "cm"),
             
             border_gp = gpar(col = "black", lwd = 1),
             rect_gp = gpar(col = "black", lwd = 1),
             
-            heatmap_legend_param = list(
-              title_gp = gpar(fontsize=23, color='black'),
-              title_position = 'topleft',
-              labels_gp = gpar(fontsize=18, color='black'),
-              legend_height = unit(6, "cm")
-            )
+            show_heatmap_legend = FALSE
+            # heatmap_legend_param = list(
+            #   title_gp = gpar(fontsize=23, color='black'),
+            #   title_position = 'topleft',
+            #   labels_gp = gpar(fontsize=18, color='black'),
+            #   legend_height = unit(6, "cm"),
+            #   grid_width = unit(1, "cm")
+            # )
     )
+    #draw body
+    draw(x, padding = unit(c(0.1, 0.03, 0.15, 0.35), "npc"))
     
-    draw(x)
+    #set and draw body legend
+    if(is.null(l)){
+      l <- Legend(col_fun = col_fun, title = "Value", title_gp = gpar(fontsize = 17,  col = 'black'),
+                  labels_gp = gpar(fontsize = 17, col = 'black'), legend_height = unit(6, "cm"), grid_width= unit(1,"cm"),
+                  title_gap = unit(0.40, "cm"))
+    }
+    draw(l, x= unit(0.85, "npc"), y = unit(0.5, "npc"), just = c("center", "right"))
     
-   
+    #pack and draw annotation legends
+    legends <- packLegend(legends, direction = "vertical")
+    for (i in seq_along(legends)) {
+      draw(legends[[i]], x = unit(0.90, "npc"), y = unit(0.85 - i * 0.05, "npc"), just = c("right", "top"))
+    }
+    
+    # Add title
+    grid.text(input$title_heatmap_plot, x = unit(0.3, "npc"), y = unit(0.95, "npc"), just = c("center", "top"), gp = gpar(fontsize = 30))
+    # Add subtitle
+    grid.text(input$subtitle_heatmap_plot, x = unit(0.3, "npc"), y = unit(0.9, "npc"), just = c("center", "top"), gp = gpar(fontsize = 20))
+    
+    # Add caption
+    grid.text(input$caption_heatmap_plot, x = unit(0.5, "npc"), y = unit(0.05, "npc"), just = c("center", "bottom"), gp = gpar(fontsize = 15, fontface = "italic"))
+    
   })
   #The ui to display the heatmap plot
   output$heatmap_plots_ui <- renderUI({
@@ -870,26 +934,36 @@ server <- function(input, output) {
     }else{
       
       fluidPage(
-          plotOutput('heatmap_plot1', height= "800px" ,width = "100%")
+          plotOutput('heatmap_plot1', height= "900px" ,width = "100%")
         )
     }
   })
   #UI for selecting annotations
   output$heatmap_annotations <- renderUI({
-    
     div(
-      
       checkboxGroupInput('heatmap_cond', 'Meta data conditions to view', 
                          choices=colnames(metaData()),
                          selected=colnames(metaData()),
                          inline=FALSE)
     )
-    
   })
-  
-  
-  
-  #______________________________Page 6____________________________#
+  #displays the correct color editors for the selected annotations
+  observe({
+    output$color_pickers_heat <- renderUI({
+      lapply(input$heatmap_cond, function(cond) {
+        div(
+          colourInput(inputId = paste0("color1_", cond),
+                     label = paste("Choose color1 for", cond),
+                     value = "grey"),
+          colourInput(inputId = paste0("color2_", cond),
+                      label = paste("Choose color2 for", cond),
+                      value = "blue")
+        )
+      })
+    })
+  })
+ 
+#______________________________Page 6____________________________#
 
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
   #-------------gene_counts_search---------#

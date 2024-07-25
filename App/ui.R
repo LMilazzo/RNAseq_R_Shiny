@@ -13,7 +13,9 @@ library(patchwork)
 library(matrixStats)
 library(S4Vectors)
 library(SummarizedExperiment)
+library(circlize)
 library(ComplexHeatmap)
+library(colourpicker)
 library(grid)
 
 
@@ -25,8 +27,6 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 1----------------------------------#
 #-----------------------------File Upload-------------------------------#
-#---------------------------Widget Count: 2-----------------------------#
-#-----------------------Expected output Count: 2------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
    tabPanel("File Upload",
       fluidPage(
@@ -119,8 +119,6 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 2----------------------------------#
 #-----------------------------DESeq2 Info-------------------------------#
-#---------------------------Widget Count: 3-----------------------------#
-#-----------------------Expected output Count: 2------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     tabPanel("DEG Analysis",
       fluidPage(
@@ -193,11 +191,9 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 3----------------------------------#
 #---------------------------Normalized Counts---------------------------#
-#----------------------------Widget Count: 1----------------------------#
-#-----------------------Expected output Count: 2------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-tabPanel("Normalized Counts Transformation",
-         fluidPage(
+  tabPanel("Normalized Counts Preview",
+          fluidPage(
 #_____________________________Main Panel________________________________#
              
              mainPanel( 
@@ -221,7 +217,7 @@ tabPanel("Normalized Counts Transformation",
                #--------------------------------------#
                #A ui element containing a datatable with the padj 
                #gene names and vst counts
-               uiOutput('vst_counts_PreviewTable')
+               uiOutput('normalized_counts_PreviewTable')
              
               )##XX##~~~Main Panel End~~~##XX##
              
@@ -229,7 +225,7 @@ tabPanel("Normalized Counts Transformation",
              
              sidebarPanel(
                
-               uiOutput('Extra_vst_count_info')
+               uiOutput('Extra_normalized_count_info')
                
              )
          ) ##XX##~~~Fluid Page Closing Bracket~~~##XX##
@@ -240,11 +236,9 @@ tabPanel("Normalized Counts Transformation",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 4----------------------------------#
 #-----------------------------PCA Plots---------------------------------#
-#---------------------------Widget Count: 5-----------------------------#
-#-----------------------Expected output Count: 1------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-tabPanel("Principle Component Plots",
-         fluidPage(
+  tabPanel("Principle Component Plots",
+          fluidPage(
 #______________________________Side Bar_________________________________#
              
              sidebarPanel( width=2,
@@ -321,11 +315,9 @@ tabPanel("Principle Component Plots",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 5----------------------------------#
 #-------------------------Correlation Analysis--------------------------#
-#---------------------------Widget Count: 0-----------------------------#
-#-----------------------Expected output Count: 0------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-tabPanel("Correlation Anaylsis",
-         fluidPage(
+  tabPanel("Correlation Anaylsis",
+          fluidPage(
 #______________________________Side Bar_________________________________#
            
            sidebarPanel( width=2,
@@ -359,12 +351,27 @@ tabPanel("Correlation Anaylsis",
            
            sidebarPanel( width=3,
               
+             #-----------------input----------------#
+             #----------------heat_annotations------#
+             #--------------------------------------# 
+             #Determines which annotations are shown          
               uiOutput('heatmap_annotations')
               #minimalize feature           
               
               ,
               
-              uiOutput('heatmap_annotation_colors')
+              #-----------------input----------------#
+              #----------------color----------------#
+              #--------------------------------------#
+              # A select input giving the choice to change the displayed genes off pvalue
+              # not just resort lists but actually display more or less genes
+              selectInput("heat_body_color", "Select color palette", 
+                          choices=c("blue-red", "REV-Rainbow", "white-black"))
+             
+             
+             ,
+             
+             uiOutput('color_pickers_heat')
               
            ), ##XX##~~~Side Panel End~~~##XX##
            
@@ -375,12 +382,10 @@ tabPanel("Correlation Anaylsis",
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 6----------------------------------#
-#-------------------------Gene Search-----------------------------------#
-#---------------------------Widget Count: 0-----------------------------#
-#-----------------------Expected output Count: 0------------------------#
+#-----------------------------Gene Search-------------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-tabPanel("Gene Search",
-         fluidPage(
+  tabPanel("Gene Search",
+          fluidPage(
           
            
          ) ##XX##~~~Fluid Page Closing Bracket~~~##XX## 

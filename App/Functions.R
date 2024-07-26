@@ -31,15 +31,12 @@ library(dplyr)
 Set_Clean_Counts <- function(raw_counts_table){
   
   if( !grepl('.tsv', raw_counts_table, fixed=TRUE) && !grepl('.csv', raw_counts_table, fixed=TRUE)){
-      return("Bad File Type Error")
+    return("Bad File Type Error")
   }
   
   #READ as a .tsv or .csv
-  if(grepl('.tsv', raw_counts_table, fixed=TRUE)){
-    counts <- read.csv(raw_counts_table, sep="\t")
-  }else{
-    counts <- read.csv(raw_counts_table)
-  }
+  if(grepl('.tsv', raw_counts_table, fixed=TRUE)){counts <- read.csv(raw_counts_table, sep="\t")} #read as tsv
+  else{counts <- read.csv(raw_counts_table)} #read as csv
 
   #gene names and ids are recommended 
   if(!'gene_id' %in% colnames(counts) || !'gene_name' %in% colnames(counts)){
@@ -103,7 +100,7 @@ splitByExpr <- function(data, gene_names, cut){
   
   
   res <- data.frame(data)
-  
+
   up <- res %>% filter(log2FoldChange > upperBound)
   up <- up[order(up$padj) , ]
   
@@ -118,4 +115,91 @@ splitByExpr <- function(data, gene_names, cut){
   
   return( list( up, down, noR ) )
   
+}
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------plot gene count----#
+#~~~~~~~~~~~Func~~~~~~~~~~~#
+#Takes a single row with a gene name, id, foldchange, and padj
+#metadata file, and conditions to view
+#returns a plot with the counts as y value and other conditions suplementing
+plotGeneCounts <- function(gene, metadata, conditions){
+  
+  name <- (gene %>% select(gene_name))[1]
+  id <- (gene %>% select(gene_id))[1]
+  p <- format((gene %>% select(padj))[1], scientific = TRUE, digits = 8)
+  fold <- round((gene %>% select(log2FoldChange))[1], digits=8)
+  counts <- (gene[,5:ncol(gene)])
+  mean <- round(mean(as.numeric(counts)))
+  
+  
+  toplot <- metadata %>% mutate(counts = data.frame(t(counts))[,1])
+  
+  print(toplot)
+  
+  print("_____________________")
+  
+  cond <- intersect(conditions, colnames(metadata))
+  
+  if(is.null(cond) || length(cond) <= 0){
+    print("select a factor")
+    return()
+  }
+  
+  aesthetics <- aes(x = as.factor(toplot[[cond[1]]]) , y = toplot$counts)
+  
+  a <- length(cond)
+  if(a >= 2){
+    aesthetics$colour = as.factor(toplot[[cond[2]]])
+  }
+  if(a >= 3){
+    aesthetics$shape = as.factor(toplot[[cond[3]]])
+  }
+  if(a >= 4){
+    aesthetics$size = as.factor(toplot[[cond[4]]])
+  }
+  
+  x <- ggplot(toplot, aesthetics) +
+    xlab(cond[1]) +
+    ylab("Count") +
+  
+    theme_minimal() +
+    
+    labs(title = name,
+         subtitle = paste("Fold Change: ", fold),
+         caption = paste("Mean Count: ",mean, "   Padj: ", p ),
+         color = if (a >= 2) cond[2] else NULL,
+         shape = if (a >= 3) cond[3] else NULL,
+         size = if (a >= 4) cond[4] else NULL
+    ) + 
+    
+    theme(plot.margin = margin(3, 2, 2, 2, "pt"),
+          axis.title.x = element_text(color='black', size = 15, margin = margin(2, 2,2, 2, "pt")),
+          axis.title.y = element_text(color='black', size=15, margin = margin(2, 2, 2, 2, "pt")),
+          axis.text.y = element_text(color='black', size=15),
+          axis.text.x = element_text(color='black', size=15),
+          panel.grid.minor.y = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          axis.line.x = element_line(color='grey'),
+          axis.line.y = element_line(color='grey'),
+          
+          legend.text = element_text(color='black', size=20),
+          legend.title = element_text(color='black', size=20),
+          legend.margin = margin(2, 2, 2, 2, "pt"),
+          
+          plot.title = element_text(color='black', size=20, margin=margin(2,2,2,2,"pt")),
+          plot.subtitle = element_text(color='black', size=15, margin=margin(2,2,5,2,"pt")),
+          plot.caption = element_text(color='black', size=10, margin=margin(2, 80, 2, 1, "pt")),
+          
+    )
+  
+  #Change size of points according to present number of variables
+  if(a >= 4){
+    x <- x + scale_size_discrete(range = c(3, 10)) + geom_beeswarm(cex = 3)
+  }else{
+    x <- x + geom_beeswarm(size=3, cex = 3)
+  }
+  
+  return(renderPlot({x}))
 }

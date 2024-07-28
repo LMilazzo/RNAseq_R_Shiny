@@ -18,6 +18,7 @@ library(ComplexHeatmap)
 library(colourpicker)
 library(grid)
 library(ggbeeswarm)
+library(ggrepel)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
@@ -338,7 +339,84 @@ ui <- navbarPage("DESeq2",
       ) ##XX##~~~Side Panel End~~~##XX##
            
     ) ##XX##~~~Fluid Page Closing Bracket~~~##XX## 
-  ) ##XX##~~~Tab Panel Closing Bracket~~~##XX##
+  ) ,  ##XX##~~~Tab Panel Closing Bracket~~~##XX##
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 7----------------------------------#
+#-----------------------------Volcano plot------------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  tabPanel("Volcano Plot",
+    fluidPage(
+      
+#_____________________________Side Bar__________________________________#
+      
+      sidebarPanel(width=2,
+         #-----------------input----------------#
+         #--title, subtitle, caption------------#
+         #--------------------------------------#           
+         textInput('title_volc_plot', 'Title', value = 'Title'),
+         textInput('subtitle_volc_plot', 'Sub Title', value = 'Sub Title'),
+         textAreaInput('caption_volc_plot', 'Caption', value = 'caption', width=200, rows=3)         
+        
+      ),##XX##~~~Side Panel End~~~##XX##
+#_____________________________Main Panel________________________________#
+      
+      mainPanel(width=7,
+
+        #-----------------input----------------#
+        #----------------cutOffs---------------#
+        #--------------------------------------#
+        # A slider to adjust what cutoffs for the vert lines will be
+        sliderInput('volcano_cutoffs', 
+        'Cut of values for diffrential expression (vertivle lines on Volcano Plot)', 
+        min=-12, max=12,step=0.01, value = c(-1, 1), width='100%'),
+        
+        uiOutput('volcano_plot_ui')
+        
+        
+      ), ##XX##~~~Main Panel End~~~##XX##
+      
+#_____________________________Side Bar__________________________________#
+      
+      sidebarPanel(width=3,
+        
+        #-----------------input----------------#
+        #----------------pvalue----------------#
+        #--------------------------------------#
+        # A select input giving the choice to change the displayed genes off pvalue
+        # not just resort lists but actually display more or less genes
+        selectInput("pvaluePg7", "Select adjusted P value cutoff for following plot", 
+                    choices=c(1.0 ,0.5, 0.05, 0.01, 0.001), selected=0.05),
+        
+        #-----------------input----------------#
+        #----------------populat---------------#
+        #--------------------------------------#
+        # A slider to adjust the population of the graph
+        sliderInput('volcano_pop', 
+                    'Change the population of the Volcano Plot', 
+                    min=0, max=1, value = 0.3, width='100%', ticks=FALSE),
+        
+        #-----------------input----------------#
+        #----------------label density---------#
+        #--------------------------------------#
+        # A slider to adjust the label population of the graph
+        sliderInput('volcano_lab_density', 
+                    'Change the label density', 
+                    min=0, max=1, value = 0.3, width='100%', ticks=FALSE),
+        
+        #-----------------input----------------#
+        #--------------gene_to_search----------#
+        #--------------------------------------#
+        # A text input later converted to vector of genes to highlight
+        textInput('volc_search',
+                  'Genes to search/highlight (can be comma seperated list)',
+                  value=NULL)
+
+      )##XX##~~~Side Panel End~~~##XX##
+
+    )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
+  )##XX##~~~Tab Panel Closing Bracket~~~##XX##
+
 
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
    

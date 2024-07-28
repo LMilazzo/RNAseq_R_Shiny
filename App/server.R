@@ -622,66 +622,12 @@ server <- function(input, output) {
       
       if(length(input$pca_cond) == 0){return()}
       
-      pca_data <- plotPCA(vst_Obj(), intgroup=input$pca_cond, ntop=input$pca_nrow, returnData=TRUE)
-      
-      percentVar <- round(100 * attr(pca_data, "percentVar"))
-      
-      aesthetics <- aes(x = pca_data$PC1, y = pca_data$PC2 )
-      
-      x <- length(input$pca_cond)
-    
-      if(x >= 1){
-        aesthetics$colour = as.name(input$pca_cond[1])
-      }
-      if(x >= 2){
-        aesthetics$shape = as.name(input$pca_cond[2])
-      }
-      if(x >= 3){
-        aesthetics$size = as.name(input$pca_cond[3])
-      }
-      
-      pca_plot <- ggplot(pca_data,aesthetics)+
-        
-        xlab(paste0("PC1: ", percentVar[1], "% variance")) +
-        ylab(paste0("PC2: ", percentVar[2], "% variance")) +
-        
-        theme_minimal() +
-
-        labs(title = input$title_pca_plot,
-            subtitle = input$subtitle_pca_plot,
-            caption = input$caption_pca_plot,
-            color = if (x >= 1) input$pca_cond[1] else NULL,
-            shape = if (x >= 2) input$pca_cond[2] else NULL,
-            size = if (x >= 3) input$pca_cond[3] else NULL
-            ) +
-
-        theme(plot.margin = margin(10, 10, 10, 10, "pt"),
-              axis.title.x = element_text(color='black', size = 20, margin = margin(15, 15, 15, 15, "pt")),
-              axis.title.y = element_text(color='black', size=20, margin = margin(15, 15, 15, 15, "pt")),
-              axis.text.y = element_text(color='black', size=15),
-              axis.text.x = element_text(color='black', size=15),
-              panel.grid.minor.y = element_blank(),
-              panel.grid.minor.x = element_blank(),
-              axis.line.x = element_line(color='grey'),
-              axis.line.y = element_line(color='grey'),
-
-              legend.text = element_text(color='black', size=20),
-              legend.title = element_text(color='black', size=20),
-              legend.margin = margin(15, 15, 15, 15, "pt"),
-
-              plot.title = element_text(color='black', size=30, margin=margin(20,20,5,10,"pt")),
-              plot.subtitle = element_text(color='black', size=20, margin=margin(5,5,15,10,"pt")),
-              plot.caption = element_text(color='black', size=15, margin=margin(10, 10, 10, 10, "pt")),
-
-              aspect.ratio = 1) +
-        coord_fixed()
-
-      #Change size of points according to present number of variables
-      if(x >= 3){
-        pca_plot <- pca_plot + scale_size_discrete(range = c(3, 10)) + geom_point()
-      }else{
-        pca_plot <- pca_plot + geom_point(size=4)
-      }
+      pca_plot <- principlePlot(vst_Obj(), 
+                                input$pca_cond, 
+                                input$pca_nrow, 
+                                input$title_pca_plot, 
+                                input$subtitle_pca_plot, 
+                                input$caption_pca_plot)
       
       pca_plot
       
@@ -998,7 +944,7 @@ server <- function(input, output) {
     #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
     #----------search gene and count---------#
     #~~~~~~~~~~~~~~~~ui~~~~~~~~~~~~~~~~~~~~~~#
-    output$gene_count_search <-renderUI({
+    output$gene_count_search <- renderUI({
       
       if(is.null(results_ddsc()) || is.null(normalized_counts())){
         
@@ -1052,6 +998,57 @@ server <- function(input, output) {
 
       )
     })
+    
+  #______________________________Page 7____________________________#
+  
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    #----------volcano_plot------------------#
+    #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
+    output$volcano_plot <- renderPlot({
+      
+      if(is.null(results_ddsc())){ return() }
+      
+      if(!is.null(input$volc_search)){
+        search <- strsplit(input$volc_search, ",")[[1]]
+        search <- trimws(search)
+      }else{
+        search <- ""
+      }
+      
+      deg <- results_ddsc() %>% 
+        mutate(gene_id = rownames(results_ddsc()))
+      
+      deg <- left_join(deg, gene_names()) %>% 
+        select(gene_name, log2FoldChange, padj)
+      
+      deg$padj <- as.numeric(deg$padj) 
+      
+      lowcut <- input$volcano_cutoffs[1]
+      highcut <- input$volcano_cutoffs[2] 
+      pcut <- input$pvaluePg7 
+      pop_score <- input$volcano_pop 
+      lab_score <- input$volcano_lab_density 
+      title <- input$title_volc_plot 
+      subtitle <- input$subtitle_volc_plot 
+      caption <- input$caption_volc_plot
+      
+      plot <- erupt(deg, lowcut, highcut, pcut, pop_score, lab_score, search, title, subtitle, caption)
+      
+      plot
+      
+    })
+    output$volcano_plot_ui <- renderUI({
+      if(is.null(results_ddsc())){
+        
+        span("No Data Yet",style="color: red;")
+        return()
+      }
+      
+      plotOutput('volcano_plot', height= "900px", width = "100%")
+      
+    })
+     
+   
   
 }#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
 

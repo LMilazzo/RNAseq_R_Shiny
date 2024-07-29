@@ -4,410 +4,417 @@ server <- function(input, output) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_____________Reactive Values______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#----
+#----
+  # Determines when to run DESeq2
+  run_question <- reactiveVal(NULL) 
   
-  run_question <- reactiveVal(NULL) #Determines when to run DESeq2
-  kill_deg <- reactiveVal(NULL) #if DESeq2 has been run the DEG upload no longer available
-  
+  # Uploaded raw counts data
   raw_counts <- reactiveVal(NULL)
+  
+  # Extracted gene names from the raw counts
   gene_names <- reactiveVal(NULL)
+  
+  # Filtered counts based on some criteria
   filtered_counts <- reactiveVal(NULL)
+  
+  # Uploaded metadata file
   metaData <- reactiveVal(NULL)
   
-  ddsc <- reactiveVal(NULL) #The Object DESeq2 
-  results_ddsc <- reactiveVal(NULL) #Just a dataframe of results
-  normalized_counts <- reactiveVal(NULL) #normalized counts from the DESeq
+  # The DESeq2 object
+  ddsc <- reactiveVal(NULL)
   
-  vst_Obj <- reactiveVal(NULL) #variance stabalized counts OBJECT
-  vst_counts <- reactiveVal(NULL)#variance stabalized counts
+  # Dataframe of DESeq2 results
+  results_ddsc <- reactiveVal(NULL)
   
+  # Normalized counts from the DESeq2 object
+  normalized_counts <- reactiveVal(NULL)
+  
+  # Variance stabilized counts object from DESeq2
+  vst_Obj <- reactiveVal(NULL)
+  
+  # Variance stabilized counts from the vst_Obj
+  vst_counts <- reactiveVal(NULL)
+#----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #-----Observe UI Event------# ----> merged_gene_counts_uploaded_file
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  # Process:
-  # Reads the uploaded file with Set_Clean_Counts() function returning a list with 
-  # the raw counts matrix and a dataframe of gene names and ids
-  # Takes out gene names and ids and sets gene_names() rownames = gene_id, col1 = gene names
-  # Sets raw_counts() colnames = samples, rownames = gene ids
-  # Sets filtered_counts() by calling filterCounts() on the raw_counts() to filter any rows with
-  # sum < 10
-  # 
-  # Error:
-  # Will return an error if neither a .csv or .tsv were uploaded
-  # Will return an error if either gene names or gene ids columns were not present
-  # Will return an error if there is a duplicate value in the gene_id column
-  # 
+#----  
+  # Reading and Setting data from raw counts upload #----
+  #----- Observe UI Event --------# 
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  # Reads the uploaded file and processes the counts matrix.
+  # Sets gene_names() and raw_counts() from the processed data.
+  # Filters rows with sum < 10 and sets filtered_counts().
+  # Errors:
+  # - Invalid file type (.csv or .tsv required)
+  # - Missing 'gene_name' or 'gene_id' columns
+  # - Duplicate 'gene_id' values
   # Notes: 
-  # Gene ids CAN be arbitrary, but MUST be unique
-  # Will display the number of rows filtered from the data
+  # - 'gene_id' must be unique
+  # - Displays the number of rows filtered
   observeEvent(input$merged_gene_counts_uploaded_file,{
-      
-      #Expect as return c(raw_counts, gene_names)           
-      func_return <- Set_Clean_Counts(input$merged_gene_counts_uploaded_file$datapath)
-      
-      if(length(func_return) == 1){
-        
-        showModal(modalDialog(
-          div(span(div(
-                p("Possible Errors: "),
-                p(" - Raw Counts upload was not valid file type (.tsv, .csv)"),
-                p(" - Raw Counts upload did not include required 'gene_name' and 'gene_id' columns"),
-                p(" - There were duplicate identifiers in the gene_id column (ids be abitrary but must be unique)")
-              ),style="color: red;")), 
-        easyClose = TRUE, footer=NULL))
-        
-        return()
 
+    req(input$merged_gene_counts_uploaded_file)  
+    
+    # Inline function to set and clean counts
+    setCleanCounts <- function(raw_counts_table) {
+
+      if (!grepl('\\.(csv|tsv)$', raw_counts_table, ignore.case = TRUE)) {
+        return("Bad File Type Error")
+      }
+      # Read as .tsv or .csv
+      
+      if (grepl('\\.tsv$', raw_counts_table, ignore.case = TRUE)) {
+        counts <- read.csv(raw_counts_table, sep = "\t")
+      } else {
+        counts <- read.csv(raw_counts_table)
+      }
+      # Check for required columns
+      if (!'gene_id' %in% colnames(counts) || !'gene_name' %in% colnames(counts)) {
+        return("Missing Column Error")
       }
       
-      raw_counts(data.frame(func_return[1]))##################################################Reactive Assignment
-      gene_names(data.frame(func_return[2]))##################################################Reactive Assignment
+      #Check for duplicate ids
+      if (anyDuplicated(counts$gene_id)) {
+        return("Duplicate ids")
+      }
       
-      filtered_counts( filterCounts(raw_counts()) )###########################################Reactive Assignment
+      gene_names <- counts %>% select(gene_name, gene_id)
       
-      diff <- nrow( raw_counts() ) - nrow( filtered_counts() )
+      # Set rownames to gene_id and remove all columns that don't start with '.'
+      counts <- counts %>% tibble::column_to_rownames('gene_id')
+      sample_cols <- grep("^\\.", colnames(counts), value = TRUE)
+      print(sample_cols)
+      non_sample_cols <- grep("^[^.]", colnames(counts), value = TRUE)
       
-      showModal(modalDialog(div(p(span(diff, style="color: red;"), 
-          " rows were removed from the data set with row sums < 10")), 
-        easyClose = TRUE, footer=NULL))
-    })
-  
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #-----Observe UI Event------# ----> meta_data_conditions_uploaded_file
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  # Process:
-  # Will set the path to the datapath of the uploaded file
-  # Will read the data from the file
-  # Sets the metaData() dataframe to be a single column with factored conditions
-  # that werre present in column 2 of the uploaded file
-  # rownames for metaData() will be the sample names present in col 1 of the uploaded file
-  # 
-  # Error:
-  # Will return an error if the upload is not a .csv or .tsv file
-  # Will return an error if the uploaded file does not have at least 2 columns to work with
-  # 
+      # Error if there are less than 2 sample columns
+      if (length(sample_cols) < 2) {
+        return("Insufficient Sample Columns Error")
+      }
+
+      # Keep only sample columns
+      counts <- counts %>% select(all_of(sample_cols))
+      
+      return(list(as.matrix(counts), gene_names))
+
+    }
+    
+    # Inline function to filter counts
+    filterCounts <- function(counts){
+      
+      keep <- rowSums(counts) > 10
+      
+      counts <- counts[keep,]
+      
+      counts <- counts
+      
+      counts <- as.matrix(counts)
+      
+      return(counts)
+    }
+    
+    #Expect as return c(raw_counts, gene_names)           
+    func_return <- setCleanCounts(input$merged_gene_counts_uploaded_file$datapath)
+    
+    # Successful output should be length 2 
+    if (length(func_return) == 1 || is.null(func_return)) {
+      showErrorModal("Possible Errors: 
+      - Raw Counts upload was not valid file type (.tsv, .csv)
+      - Raw Counts upload did not include required 'gene_name' and 'gene_id' columns
+      - There were duplicate identifiers in the gene_id column (ids can be arbitrary but must be unique)
+      - There were not sufficient sample columns, must be denoted with '.' ")
+      return()
+    }
+    
+    # ====== Reactive Values ======
+    raw_counts(data.frame(func_return[1]))
+    gene_names(data.frame(func_return[2]))
+    filtered_counts( filterCounts(raw_counts()) )
+    
+    #How many rows were filtered
+    diff <- nrow( raw_counts() ) - nrow( filtered_counts() )
+    showModal(modalDialog(div(p(span(diff, style="color: red;"), 
+        " rows were removed from the data set with row sums < 10")), 
+      easyClose = TRUE, footer=NULL))
+
+  })
+  #----
+  # Reading the Metadata file #----
+  #----- Observe UI Event --------# 
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  # Reads the uploaded metadata file and processes the data.
+  # Sets metaData() to a dataframe with factored conditions from column 2.
+  # Row names for metaData() will be the sample names from column 1.
+  # Errors:
+  # - Invalid file type (.csv or .tsv required)
+  # - Insufficient columns (at least 2 required)
   # Notes:
-  # More columns are fine however only the first and second are considered
-  observeEvent(input$meta_data_conditions_uploaded_file,{
-      
+  # - Only the first two columns are considered; more columns are allowed.
+    observeEvent(input$meta_data_conditions_uploaded_file, {
+  
       req(input$meta_data_conditions_uploaded_file)
       
-      metaDataFilePath  <- input$meta_data_conditions_uploaded_file$datapath
+      metaDataFilePath <- input$meta_data_conditions_uploaded_file$datapath
       
-      #Error PG1.1 not a readable file
-      if( !grepl('.csv',metaDataFilePath , fixed=TRUE) && !grepl('.tsv',metaDataFilePath , fixed=TRUE)){
-        
-        showModal(modalDialog(tags$p(style = "color: red;","Error: Meta Data Table upload expected a .csv or .tsv file"), easyClose = TRUE, footer=NULL))
-        
+      # Error: Not a readable file
+      if (!grepl('\\.(csv|tsv)$', metaDataFilePath, ignore.case = TRUE)) {
+        showErrorModal("Error: Meta Data Table upload expected a .csv or .tsv file")
         return()
       }
       
-      if(grepl('.tsv',metaDataFilePath , fixed=TRUE)){ md <- read.csv(metaDataFilePath, sep="\t")} #read as tsv
-      else{ md <- read.csv(metaDataFilePath) } #read as csv
+      if (grepl('\\.tsv$', metaDataFilePath, ignore.case = TRUE)) { 
+        md <- read.csv(metaDataFilePath, sep = "\t") 
+      } else { 
+        md <- read.csv(metaDataFilePath) 
+      }
       
-      #Error PG1.2 only one column
-      if( ncol(md) < 2 ){
-        
-        showModal(modalDialog(tags$p(style = "color: red;","Error: Incorrect file format"), easyClose = TRUE, footer=NULL))
-        
+      # Error: Insufficient columns
+      if (ncol(md) < 2 || !"sample" %in% colnames(md)) {
+        showErrorModal("Error: Incorrect file format")
         return()
       }
       
-      coldata <- data.frame( md[,2:ncol(md)] )
+      #Enforce sample naming convention
+      md$sample <- ifelse(!grepl("^\\.", md$sample), paste0(".", md$sample), md$sample)
+      md <- md %>%
+              tibble::column_to_rownames('sample')
       
-      for (i in ncol(coldata)) { 
-        coldata[,i] <- as.factor(coldata[,i]) #convert columns to factors
-      } 
       
-      rownames(coldata) <- md[,1]
+      md[] <- lapply(md, as.factor)
       
-      colnames(coldata) <- colnames(md)[-1]
+      # ====== Reactive Assignment ======
+      metaData(md) 
       
-      metaData(coldata)##################################################Reactive Assignment
-
     })
-  
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #---Observe input Event-----# ----> run_DESeq2
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
-  # Process:
-  # Determines whether upon input of the run differential expression button the 
-  # required data has been uploaded
-  # 
-  # Error:
-  # will return an error if the filtered_counts() object is null or as 0 rows
-  # will return an error if the metaData() object is null
-  # 
+  #----
+  # Running DESeq #----
+  #----- Observe UI Event --------# 
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  # Handles the initiation and execution of DESeq2 upon user interaction.
+  # Checks for required data availability, prompts user confirmation, and processes the data.
+  # Errors:
+  # - Displays an error if `filtered_counts()` is NULL or has zero rows.
+  # - Displays an error if `metaData()` is NULL.
   # Notes:
-  # Displays a modal with information and warnings about running DESeq
-  # Displays a cancel or run button in response to the information above
-  observeEvent(input$run_DESeq2,{
-      
-      if(is.null(filtered_counts()) || nrow(filtered_counts()) <= 0 ){
+  # - Locks out DEG upload option upon running DESeq2.
+  # - Sets DESeq2 results and related objects as reactive values for further use.
+    observeEvent(input$run_DESeq2, {
 
-        showModal(modalDialog(p(span("Merged counts table required", style="color: red;")), easyClose=TRUE, footer=NULL))
-
-        return()
-      }
-
-      if(is.null(metaData())){
-
-        showModal(modalDialog(p(span("Meta Data table required", style="color: red;" )), easyClose=TRUE, footer=NULL))
-        
+      # Check for required data
+      if (is.null(filtered_counts()) || nrow(filtered_counts()) <= 0) {
+        showErrorModal("Merged counts table required")
         return()
       }
       
-      Sys.sleep(.5)
+      if (is.null(metaData())) {
+        showErrorModal("Meta Data table required")
+        return()
+      }
       
+      # Prompt user confirmation
       showModal(modalDialog(
-          div(p("Would you like to generate a DEG dataset with the given raw counts & meta data."), 
+        div(
+          p("Would you like to generate a DEG dataset with the given raw counts & meta data?"), 
           p("This action will lock you out of uploading an already generated DEG table and will run DESeq2 with default parameters for your data."),
-          p("If you have previously uploaded a DEG file it will be scrapped from the application, all tables will display the new DESeq2 data, visuals and graphs will also be updated accordingly.")
-          ),
-          footer=tagList(
-            actionButton('cancel', 'Cancel'),
-            actionButton('run', 'Run')
-          )
+          p("If you have previously uploaded a DEG file, it will be scrapped from the application. All tables will display the new DESeq2 data, and visuals and graphs will also be updated accordingly.")
+        ),
+        footer = tagList(
+          actionButton('cancel', 'Cancel'),
+          actionButton('run', 'Run')
+        )
       ))
 
-  })
-  # Cancels the modal and does not run DESeq if cancel button is selected
-  observeEvent(input$cancel,{
-    run_question(NULL)##################################################Reactive Assignment
-    removeModal()
-  }) 
-  # Sets the run_question() object to true if selected 
-  # This is used so that if run is selected multiple times with the same data DESeq is not
-  # activated again and the user has to wait Also so when input$run is observed in the future
-  # DESeq2 does not activate again by mistake
-  # Sets kill_DEG() to TRUE to remove the option on page 2 for uploaded DEG results and starting 
-  # from there
-  observeEvent(input$run,{
-    run_question(TRUE)##############################################Reactive Assignment
-    kill_deg(TRUE)##################################################Reactive Assignment
-    removeModal()
-  })
-  # Runs DESeq 2 upon input of input$run with mostly default parameters and single 
-  # condition design.
-  # Sets the ddsc() object to be a DESeqDataSet class object with the data from the experiment
-  # Sets the results_ddsc() to be a dataframe consisting of the output of running results() on 
-  # the ddsc() object. This should just be a dataframe with the DEG results
-  # Sets vst_counts() to be the assay() data.frame of the variance stabilized transformation of the 
-  # counts matrix
-  # Sets vst_Obj() to be the variance stabilized counts object obtained from the vst() funciton
-  observe({
-    decision <- run_question()
-    
-    if(!is.null(decision)){
-      if(decision){
+      # Observe cancel and run buttons
+      observeEvent(input$cancel, {
         removeModal()
-        
-        coldata <- metaData()
+      }, once = TRUE) # `once = TRUE` ensures this observer is only triggered once per modal
+
+      observeEvent(input$run, {
+
+        # ====== Reactive Assignment ======
+        kill_deg(TRUE) 
+        removeModal()
+
+        # Run DESeq2 process
+        metadata <- metaData()
         countdata <- filtered_counts()
 
-        condition <- coldata$condition
+        condition <- metadata[,1]
+
+        tryCatch({
+          
+          ddsc <- DESeqDataSetFromMatrix(countData = round(countdata), 
+                                        colData = metadata, 
+                                        design = ~ condition)
+
+          showModal(modalDialog("Running DESeq...", footer = NULL))
+
+          deseqdataset <- DESeq(ddsc)
+          
+          # ====== Reactive Assignment ======
+          ddsc(deseqdataset)
+          results_ddsc(data.frame(results(ddsc())))
+          vstObject <- vst(ddsc(), blind = TRUE)
+          normalized_counts(data.frame(counts(ddsc(), normalized = TRUE)))
+          vst_counts(data.frame(assay(vstObject)))
+          vst_Obj(vstObject)
+
+          showModal(modalDialog("DESeq complete with no fatal errors", easyClose = TRUE, footer = NULL))
+
+        }, error = function(e) {
+          
+          showErrorModal(paste("Error in DESeq2 process:", e$message))
         
-        print(head(countdata))
-        print(coldata)
-        print(condition)
+        })
+
+      }, once = TRUE) # `once = TRUE` ensures this observer is only triggered once per modal
+    
+    })
+  #----
+  # Handling a Case of running with DEG data #----
+  #----- Observe UI Event --------# 
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+  # Handles the uploading and processing of precomputed DEG analysis data.
+  # Sets the results_ddsc(), gene_names(), normalized_counts(), vst_counts(), and vst_Obj() 
+  # reactive values based on the uploaded data.
+  # Errors:
+  # - Displays an error if the file is not a .csv or .tsv.
+  # - Displays an error if required columns (gene_id, gene_name, log2FoldChange, padj) are missing.
+  # - Displays an error if there are duplicate values in the gene_id column.
+  # - Displays an error if the number of rows in the counts data does not match the number of rows in gene names.
+  # - Displays a warning if sample columns are missing.
+  # Notes:
+  # - vst_Obj in this case holds a DESeqTransform object instead of a VST object.
+  # - determines the status of what has been uploaded and processed PREVENTS reprocessing the same data
+    degStatus <- reactiveVal(1)
+    # 1 metadata has been uploaded waiting for DEG or no files uploaded
+    # 2 DEG has been uploaded wating for metadata
+    # 3 Both files are uploaded a file has potentially been changed
+  # - determines whether or not this process is available to the user
+    kill_deg <- reactiveVal(NULL)
+  # - Recommends uploading a proper metadata file for full analysis.
+    observeEvent(list(metaData(), input$DEG_analysis_data),{
+      
+      req(input$DEG_analysis_data)
+
+      if( degStatus() == 1  || degStatus() == 3 ){
+
+        filePath <- input$DEG_analysis_data$datapath
+
+        #Handle for filetype
+        if (!grepl('\\.(csv|tsv)$', filePath, ignore.case = TRUE)) {
+          showErrorModal("Error: DEG data upload expected a .csv or .tsv file")
+          return()
+        }
+
+        #Read file
+        if (grepl('\\.tsv$', filePath, ignore.case = TRUE)) { 
+          data <- read.csv(filePath, sep = "\t") 
+        } else { 
+          data <- read.csv(filePath) 
+        }
         
-        ddsc <- DESeqDataSetFromMatrix(countData = round(countdata), 
-                                    colData = coldata, 
-                                    design = ~ condition)
+        #Get data column names
+        req_col <- c( "gene_id" , "gene_name" , "log2FoldChange" , "padj" )
+        possible_col <- c("gene_id", "gene_name", "baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj")
+        col <- colnames(data)
         
-        showModal(modalDialog("Running DESeq...", footer=NULL))
+        common_col <- intersect(possible_col, col)
+  
+        if(! all(req_col %in% common_col) ){
+          showErrorModal("Error: data missing either ('gene_id', 'gene_name', 'log2FoldChange', 'padj')")
+          return()
+        }
+
+        df <- data %>%
+                  select( all_of(common_col) )
+
+        # ====== Reactive Assignment ======
         
-        d <- DESeq(ddsc)
+        gene_names(df %>% select(gene_name, gene_id)) 
         
-        ddsc(d)##################################################Reactive Assignment
-        results_ddsc(data.frame(results(ddsc())))##################################################Reactive Assignment
+        #Check for duplicate ids
+        if (anyDuplicated(gene_names()$gene_id)) {
+          showErrorModal("Error: There appears to be duplicate gene names")
+          return()
+        }
+
+        # Process DEG data
+        df <- df %>%
+          tibble::column_to_rownames('gene_id') %>%
+          select(-gene_name)
         
-        showModal(modalDialog("Done!!", easyClose=TRUE, footer=NULL))
-        removeModal()
-       
-        Cvst <- vst(ddsc(), blind=TRUE)
-        normalized_counts(data.frame(counts(ddsc(), normalized=TRUE)))##################################################Reactive Assignment
-        vst_counts(data.frame(assay(Cvst)))##################################################Reactive Assignment
-        vst_Obj(Cvst)##################################################Reactive Assignment
+        #====== Reactive Assignment ======
+        results_ddsc(df) 
+
+        # Process sample columns
+        sample_columns <- data[, grep("^\\.", colnames(data), value = TRUE)] # all columns starting with '.'
+
+        if (ncol(sample_columns) == 0) {
+          showErrorModal("Warning: Some features not available because of missing sample data")
+          return()
+        }
+
+        if (!nrow(sample_columns) == nrow(gene_names())) {
+          showErrorModal("Error: number of rows in the counts data != rows in gene names list")
+          return()
+        }
+
+        # Set row names for sample columns
+        rownames(sample_columns) <- gene_names()$gene_id
+
+        #====== Reactive Assignment ======
+        normalized_counts(sample_columns) 
+        degStatus(2)
+
+        # Metadata upload reminder if no metadata return and cancel process
+        if (is.null(metaData())) {
+          showErrorModal("Warning: For a full analysis, it is recommended to return to page one and submit a proper meta data file")
+          return()
+        }
         
+      }
+      
+      if( degStatus() == 2 || degStatus() == 3 ){
+
+        if( nrow(metaData()) != ncol(normalized_counts()) ){
+          showErrorModal("Error: Number of samples in meta data is not the same as the number of samples in the counts data")
+          return()
+        }
+      
+        counts <- round(normalized_counts())    
+        
+        v <- varianceStabilizingTransformation(as.matrix(counts), blind=TRUE)
+        se <- SummarizedExperiment(assays = list(counts = v), colData = metaData())
+        vsd <- DESeqTransform(se)
+
+        #====== Reactive Assignment ======
+        vst_counts(data.frame(v))
+        vst_Obj(vsd)
+        degStatus(3)
       }else{
         return()
       }
-    
-    }else{
-      return()
-    }
-    
-  }) 
+      
+    })
   
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #---Observe input Event-----# ----> DEG_analysis_data
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~#  
-  # Process:
-  # On page 2 if DEG results are uploaded they will be read
-  # The DEG results will be put in the results_ddsc() this should be the first 8 cols
-  # of any uploaded DEG results.
-  # The gene_names() object is set to the first and second columns of the DEG results dataframe
-  # results_ddsc() is  set to be the DEG results -gene_name columns and with gene_id as rownames
-  # Sets vst_counts() to any columns after the 8th which are designated to user variance stabalized
-  # transformation counts. The counts put in vst_counts() with this method are expected to be normalized
-  # vst() is not called on them.
-  # 
-  # Error:
-  # Will return an error if.tsv or .csv are not in the file path
-  # Will return an error if there are less than 8 columns indicated the required 
-  # data isnt present
-  # Will return an error if the header format does not match the expected format
-  observeEvent(input$DEG_analysis_data,{
- 
-     filePath <- input$DEG_analysis_data$datapath
-     
-     if( !grepl('.tsv', filePath, fixed=TRUE) && !grepl('.csv', filePath, fixed=TRUE)){
-      
-      showModal(modalDialog(tags$p(style = "color: red;","Error: Meta Data Table upload expected a .csv or .tsv file"), easyClose = TRUE, footer=NULL))
-      
-      return()
-     }
-      
-     if(grepl('.tsv', filePath, fixed=TRUE)){ data <- read.csv(filePath, sep="\t") } #read as tsv
-     else{ data <- read.csv(filePath) } #read as csv
-    
-     cols <- colnames(data)
-     possible_columns <- c("gene_id","gene_name","baseMean","log2FoldChange","lfcSE","stat","pvalue","padj")
-     common_columns <- intersect(possible_columns, cols)
 
-     #Required stuff
-     #Set geneID
-     if(! "gene_id" %in% common_columns){showModal(modalDialog(tags$p(style = "color: red;","Error: a gene id column is required with header gene_id"), easyClose = TRUE, footer=NULL))
-       return()
-     }else{ df <- data.frame(data %>% select(gene_id)) }
-     #Set gene names
-     if(! "gene_name" %in% common_columns){showModal(modalDialog(tags$p(style = "color: red;","Error: a gene name column is required with header gene_name"), easyClose = TRUE, footer=NULL))
-       return()
-     }else{ df <- df %>% mutate(gene_name = data$gene_name) }
-     #set fold change
-     if(! "log2FoldChange" %in% common_columns){showModal(modalDialog(tags$p(style = "color: red;","Error: a fold change column is required with header log2FoldChange"), easyClose = TRUE, footer=NULL))
-       return()
-     }else{df <- df %>% mutate(log2FoldChange = data$log2FoldChange)}
-     #Set padj
-     if(! "padj" %in% common_columns){showModal(modalDialog(tags$p(style = "color: red;","Error: a padj column is required with header padj"), easyClose = TRUE, footer=NULL))
-       return()
-     }else{df <- df %>% mutate(padj = data$padj)}
-     
-     #Optional stuff
-     if("baseMean" %in% common_columns){ df <- df %>% mutate(baseMean  = data$baseMean) }
-     if("lfcSE" %in% common_columns){ df <- df %>% mutate(lfcSE = data$lfcSE) }
-     if("stat" %in% common_columns){ df <- df %>% mutate(stat = data$stat) }
-     if("pvalue" %in% common_columns){ df <- df %>% mutate(pvalue = data$pvalue) }
-    
-     
-     gene_names(df[,2:1])##################################################Reactive Assignment
-    
-     #Check for duplicated Gene IDS
-     g_ids <- gene_names() %>% select(gene_id)
-     g_ids_unique <- g_ids %>% unique()
-     if( nrow(g_ids) != nrow(g_ids_unique) ){
-      
-       showModal(modalDialog(tags$p(style = "color: red;","Error: There appears to be duplicate gene names"), easyClose = TRUE, footer=NULL))
-       return()
-     }
 
-     #pull DESeq data
-     df <- df %>% 
-      tibble::column_to_rownames('gene_id') %>% 
-      select(-gene_name)
-     
-     results_ddsc(df)##################################################Reactive Assignment
-     
-     #pull sample columns
-     sample_columns <- data[,grep("^\\.", colnames(data), value = TRUE)] # all columns starting with '.'
-     
-     #give message if no sample columns
-     if(ncol(sample_columns) == 0){
-       
-       showModal(modalDialog(tags$p(style = "color: red;","Some features not available because of missing sample data"), easyClose = TRUE, footer=NULL))
-       return()
-     }
-     
-     #Sample data should be of the same length as the DEG data
-     if(! nrow(sample_columns) == nrow(gene_names())){
-       
-       showModal(modalDialog(tags$p(style = "color: red;","Error: number of rows in the counts data != rows in gene names list"), easyClose = TRUE, footer=NULL))
-       return()
-     }
-    
-     #Set row names for sample columns
-     rownames(sample_columns) <- gene_names()$gene_id
-     
-     normalized_counts(sample_columns)##################################################Reactive Assignment
-     
-     #metadata upload reminder
-     if(is.null(metaData())){
-       
-       showModal(modalDialog(tags$p(style = "color: red;","For a full analysis it is recomended to return to page one and submit a proper meta data file"), easyClose = TRUE, footer=NULL))
-     }
-
-  })
-  #If metaData and the DEG analysis info has been uploaded than ddsc() object DESeq2 dataset, 
-  #and a DESeqTransform object will take the place of vst_counts_VST_OBJECT
-  #A DESeqTransform is similar in that you can see the assays, in this case the counts they uploaded
-  #(they have not been transformed like in the vst object as uploading a DEG you assumed responsibility for
-  #normilization, due to this the size factors are not available for display), 
-  #you may use plotPCA to plot principle components which is the primary use of the vst_counts
-  # ALL other visuals volcano and counts plots do not require this specific object.
-  observeEvent(list(metaData(), input$DEG_analysis_data),{
-    
-    if(is.null(input$DEG_analysis_data)){return()}
-    if(is.null(metaData())){return()}
-    if(is.null(normalized_counts())){return()}
-
-   
-    if(nrow(metaData()) != ncol(normalized_counts())){
-      
-      showModal(modalDialog(tags$p(style = "color: red;","Error: Number of samples in meta data is not the same as the number of samples in the counts data"), easyClose = TRUE, footer=NULL))
-      return()
-    }
-    
-    #Normalize sample names to match names in metadata
-    sample_names_in_metaData <- rownames(metaData())
-  
-    counts <- round(normalized_counts())    
-    
-    colnames(counts) <- sample_names_in_metaData
-    
-    v <- varianceStabilizingTransformation(as.matrix(counts), blind=TRUE)
-    se <- SummarizedExperiment(assays = list(counts = v), colData = metaData())
-    vsd <- DESeqTransform(se)
-
-    vst_counts(data.frame(v))##################################################Reactive Assignment
-    vst_Obj(vsd)##################################################Reactive Assignment
-   
-  })
-
+#----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#----
+  #______________________________Page 1____________________________#----
 
-  #______________________________Page 1____________________________#
-
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #--------raw_counts_PreviewTable---------#
-    #~~~~~~~~~~~~~~Data Table~~~~~~~~~~~~~~~~#
-    #A Data Table preview of what is inside the uploaded counts table 
-    #after formating correctly
-      #Expected Format:
-      #axis.names| Gene Name | Sample1 | Sample 2 
-      #Gene_ID_1 |    x      |    x    |    x
-      #Gene_ID_2 |    x      |    x    |    x
-    output$raw_counts_PreviewTable <- renderDT({
-        
-        req(input$merged_gene_counts_uploaded_file)
+    # Raw Counts data table 
+    output$raw_counts_PreviewTable <- renderUI({
         
         df <- raw_counts()
         
+        table <- renderUI({span("No Raw counts to display",style="color: red;")})
+
         if(!is.null(df)){
           
           #Some editing to display the gene names as well
@@ -416,32 +423,28 @@ server <- function(input, output) {
                 tibble::column_to_rownames('gene_id')
           
           #Organize columns
-          data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
+          df <- data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
           
+          table <- renderDT({df}, rownames = TRUE, options = list(pageLength=5))
         }
-      }, rownames = TRUE, options = list(pageLength=5))
+
+        div(table)
+
+    })
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #--------sample_conditions_Preview-------#
-    #~~~~~~~~~~~~~~~~~Table~~~~~~~~~~~~~~~~~~#
-    #Just prints the samples and their conditions 
-    #May be helpful to ensure your file was read correctly
-    output$sample_conditions_PreviewTable <- renderTable({
-        if(!is.null(metaData())){ metaData() }
-      })
+    # render table for metadata
+    output$sample_conditions_PreviewTable <- renderUI({
+        if(!is.null(metaData())){ renderTable({metaData()}, rownames  = TRUE) }
+        else{span("Upload Meta Data",style="color: red;")}
+    })
     
-  #______________________________Page 2____________________________#
+
+  #______________________________Page 2____________________________#----
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #-----pg2_display_upload_DEG_data--------#
-    #~~~~~~~~~~~~~Conditional UI~~~~~~~~~~~~~#
-    # Decides whether to display the upload form for the DEG data based on whether 
-    # the user has uploaded counts and metadata to perform DESeq2
-    #@return either an upload form or nothing
-    output$pg2_display_upload_DEG_data <- renderUI({
+    # Option for uploading DEG data (Only available additionally)
+    output$deg_upload <- renderUI({
         
       if(is.null(kill_deg())){
-        
         fileInput("DEG_analysis_data", 
             div(
               p("Differential Expression data .tsv/.csv"),
@@ -454,18 +457,13 @@ server <- function(input, output) {
         }else{
           return()
         }
-      })
+    })
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #-----DESeq_Expression_Analysis_Tables---#
-    #~~~~~~~~~~~~~~~~~HTML UI~~~~~~~~~~~~~~~~#
-    #A ui div element featuring a series of interactable tables that show gene data
-    output$DESeq_Expression_Analysis_Tables <- renderUI({
+    # 3 tables feature genes that fit in expression categories
+    output$expression_tables <- renderUI({
 
       if(is.null(results_ddsc()) || is.null(gene_names())){
-        
-        p(span("No Data Yet",style="color: red;"))
-        return()
+        return(renderUI({span("No Data Yet",style="color: red;")}))
       }
       
       #Splits the DEG list into groups by fold change 
@@ -503,27 +501,20 @@ server <- function(input, output) {
         
         datatable(t3, rownames=FALSE, option=list(pageLength=7))
       )
+    
     })
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #---------Distribution_Histogram_ui------#
-    #~~~~~~~~~~~~~~~~~Histogram~~~~~~~~~~~~~~#
-    #A simple histogram for a visual display of the distribution or regulation
-    #UI for histogram display and title 
-    #(Prevents the blank plot box from showing when no data)
+    # A simple histogram that shows the distribution of fold change
     output$Distribution_Histogram_ui <- renderUI({
         if(is.null(results_ddsc())){
           return()
         }
         
         plot <- renderPlot({
-          
           p <- as.numeric(input$pvaluePg2)
-
           data <- results_ddsc() %>% 
                               filter(padj < p) %>% 
                               select('log2FoldChange')
-          
           ggplot(data, aes(x=log2FoldChange)) + 
             geom_histogram(bins=50, fill='darkslategrey') + 
             xlab("Log2 Fold Change") + 
@@ -546,20 +537,16 @@ server <- function(input, output) {
           HTML("<h4>Distribution of Fold Change</h4>"),
           plot
         )
+        
       })
     
-  #______________________________Page 3____________________________#
+  #______________________________Page 3____________________________#----
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #-------vst_counts_PreviewTable----------#
-    #~~~~~~~~~~~~~~~~dataTable~~~~~~~~~~~~~~~#
-    # A DataTable with the variance stabilized transformation of the counts
+    # A data table showing normalized counts
     output$normalized_counts_PreviewTable <- renderUI({
       
       if(is.null(normalized_counts())){
-        
-        p(span("No Data Yet",style="color: red;"))
-        return()
+        return(span("No Data Yet",style="color: red;"))
       }
       
       p <- as.numeric(input$pvaluePg3)
@@ -586,14 +573,10 @@ server <- function(input, output) {
       
     })
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #----------Extra_vst_count_info----------# #Size factors only right now
-    #~~~~~~~~~~~~~~~~UI output~~~~~~~~~~~~~~~#
+    # A sidebar showing extra info like size factors if they are available
     output$Extra_normalized_count_info <- renderUI({
       
       if(is.null(normalized_counts())){
-        
-        p(span("No Data Yet",style="color: red;"))
         return()
       }
       
@@ -610,16 +593,12 @@ server <- function(input, output) {
       }
     })
     
-  #______________________________Page 4____________________________#
+  #______________________________Page 4____________________________#----
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #-------principle_component_plots--------#
-    #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
-    # A ggplot using the pcaPlot data
-    output$pca_plot1 <- renderPlot({
+    # The principle component plot
+    output$principle_components <- renderPlot({
       
       if(is.null(vst_Obj())){return()}
-      
       if(length(input$pca_cond) == 0){return()}
       
       pca_plot <- principlePlot(vst_Obj(), 
@@ -632,19 +611,18 @@ server <- function(input, output) {
       pca_plot
       
     })
-    #Displayable ui for the pcaPlot
+    # UI holding the plot
     output$principle_component_plots_ui <- renderUI({
+      
       if(is.null(vst_Obj()) || length(input$pca_cond) == 0){
-        
-        span("No Data Yet, Or No Selected Factors",style="color: red;")
-        return()
+        return(span("No Data Yet, Or No Selected Factors",style="color: red;"))
       }
 
-      plotOutput('pca_plot1', height= "700px", width = "100%")
+      plotOutput('principle_components', height= "700px", width = "100%")
     
     })
-    #Change included genes widget
-    output$change_n_pca_plot <- renderUI({
+    # Widget for changing genes using in plot
+    output$pca_n_counts <- renderUI({
       
       #Sets the number of genes to 500, or the maximum
       if(is.null(vst_counts())){
@@ -668,8 +646,8 @@ server <- function(input, output) {
                     value=start, min=2, max=m)
       )
     })
-    #Change the metadata columns that should be included in the pcaPlot
-    output$change_mColumns_for_pca <- renderUI({
+    #Widget for changing the metadata columns
+    output$pca_metadata <- renderUI({
       div(
         checkboxGroupInput('pca_cond', 'Meta data conditions to view', 
                         choices=colnames(metaData()),
@@ -678,12 +656,9 @@ server <- function(input, output) {
       )
     })
     
-  #______________________________Page 5____________________________#
+  #______________________________Page 5____________________________#----
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #-------------heat_map_plot--------------#
-    #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
-    #The heat map plot
+    # The heatmap for correlation analysis
     output$heatmap_plot1 <- renderPlot({
       if(is.null(vst_counts())){return()}
         
@@ -822,19 +797,17 @@ server <- function(input, output) {
       grid.text(input$caption_heatmap_plot, x = unit(0.5, "npc"), y = unit(0.05, "npc"), just = c("center", "bottom"), gp = gpar(fontsize = 15, fontface = "italic"))
       
     })
-    #The ui to display the heatmap plot
+    # The ui to display the heatmap plot
     output$heatmap_plots_ui <- renderUI({
       
       if(is.null(vst_counts())){
-        
-        span("No Data Yet",style="color: red;")
-        return()
+        return(span("No Data Yet",style="color: red;"))
       }  
       fluidPage(
           plotOutput('heatmap_plot1', height= "900px" ,width = "100%")
-        )
+      )
     })
-    #UI for selecting annotations
+    # UI for selecting annotations
     output$heatmap_annotations <- renderUI({
       div(
         checkboxGroupInput('heatmap_cond', 'Meta data conditions to view', 
@@ -843,8 +816,9 @@ server <- function(input, output) {
                           inline=FALSE)
       )
     })
-    #displays the correct color editors for the selected annotations
+    # displays the correct color editors for the selected annotations
     observe({
+      
       output$color_pickers_heat <- renderUI({
         
         lapply(input$heatmap_cond, function(cond) {
@@ -861,17 +835,12 @@ server <- function(input, output) {
       })
     })
   
-  #______________________________Page 6____________________________#
+  #______________________________Page 6____________________________#----
     
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #----------important genes---------------#
-    #~~~~~~~~~~~~~~~~ui~~~~~~~~~~~~~~~~~~~~~~#
-    # a bar showing the maybe important genes
+    # A ui bar on the left displaying some important genes 
     output$leftbar_gene_plots <- renderUI({
       
       if(is.null(results_ddsc()) || is.null(normalized_counts())){
-        
-        span("No Data Yet",style="color: red;")
         return()
       }
 
@@ -894,35 +863,30 @@ server <- function(input, output) {
       lf <- counts[order(-counts$log2FoldChange),] %>% head(1)
       hf <- counts[order(counts$log2FoldChange),] %>% head(1)
       
-      top_pval <- plotGeneCounts(tp, 
-                                 metaData(), 
-                                 colnames(metaData()))
-      low_fold <- plotGeneCounts(lf, 
-                                 metaData(), 
-                                 colnames(metaData()))
-      high_fold <- plotGeneCounts(hf, 
-                                  metaData(), 
-                                  colnames(metaData()))
+      top_pval <- gplop(tp, metaData(), colnames(metaData()))
+      
+      low_fold <- gplop(lf, metaData(), colnames(metaData()))
+      
+      high_fold <- gplop(hf, metaData(), colnames(metaData()))
+      
       div(
         
         h2("Lowest adjusted pval"),
         
-        top_pval,
+        renderPlot({top_pval}),
         
         h2("Lowest Fold Change"),
         
-        high_fold,
+        renderPlot({high_fold}),
         
         h2("Highest Fold Change"),
         
-        low_fold
+        renderPlot({low_fold})
         
-        )
+      )
 
     })
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #----------gene_name_list----------------#
-    #~~~~~~~~~~~~~~~~ui~~~~~~~~~~~~~~~~~~~~~~#
+    # A ui bar on the right displaying a datatable of all the genes
     output$gene_name_list <- renderUI({
       
       if(is.null(gene_names())){
@@ -941,15 +905,11 @@ server <- function(input, output) {
       )
 
     })
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #----------search gene and count---------#
-    #~~~~~~~~~~~~~~~~ui~~~~~~~~~~~~~~~~~~~~~~#
+    # A ui for displaying the search method 
     output$gene_count_search <- renderUI({
       
       if(is.null(results_ddsc()) || is.null(normalized_counts())){
-        
-        span("No Data Yet",style="color: red;")
-        return()
+        return(span("No Data Yet",style="color: red;"))
       }
       
       counts <- data.frame(round(normalized_counts())) %>%
@@ -989,7 +949,8 @@ server <- function(input, output) {
               gene <- gene[1,]
             }
             
-            plotGeneCounts(gene, metaData(), input$gene_count_plot_search_cond)
+            x <- gplop(gene, metaData(), input$gene_count_plot_search_cond)
+            renderPlot({x})
             
           }else{
             p("Nothing Here Yet")
@@ -999,11 +960,9 @@ server <- function(input, output) {
       )
     })
     
-  #______________________________Page 7____________________________#
+  #______________________________Page 7____________________________#----
   
-    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-    #----------volcano_plot------------------#
-    #~~~~~~~~~~~~~~~~plot~~~~~~~~~~~~~~~~~~~~#
+    # The plot for the volcano plot page
     output$volcano_plot <- renderPlot({
       
       if(is.null(results_ddsc())){ return() }
@@ -1046,11 +1005,10 @@ server <- function(input, output) {
       plot
       
     })
+    # A ui for displaying the volcano plot
     output$volcano_plot_ui <- renderUI({
       if(is.null(results_ddsc())){
-        
-        span("No Data Yet",style="color: red;")
-        return()
+        return(span("No Data Yet",style="color: red;"))
       }
       
       plotOutput('volcano_plot', height= "900px", width = "100%")
@@ -1059,5 +1017,6 @@ server <- function(input, output) {
      
    
   
+#----
 }#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
 

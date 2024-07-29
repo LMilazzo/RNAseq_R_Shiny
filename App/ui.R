@@ -19,6 +19,7 @@ library(colourpicker)
 library(grid)
 library(ggbeeswarm)
 library(ggrepel)
+library(BioVis)
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 

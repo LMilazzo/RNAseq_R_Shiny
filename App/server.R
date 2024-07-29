@@ -1012,7 +1012,7 @@ server <- function(input, output) {
         search <- strsplit(input$volc_search, ",")[[1]]
         search <- trimws(search)
       }else{
-        search <- ""
+        search <- NULL
       }
       
       deg <- results_ddsc() %>% 
@@ -1032,7 +1032,16 @@ server <- function(input, output) {
       subtitle <- input$subtitle_volc_plot 
       caption <- input$caption_volc_plot
       
-      plot <- erupt(deg, lowcut, highcut, pcut, pop_score, lab_score, search, title, subtitle, caption)
+      plot <- erupt( deg, 
+                     lowcut, 
+                     highcut, 
+                     pcut, 
+                     pop_score, 
+                     lab_score, 
+                     search, 
+                     title, 
+                     subtitle, 
+                     caption)
       
       plot
       

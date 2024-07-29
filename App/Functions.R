@@ -133,6 +133,9 @@ plotGeneCounts <- function(gene, metadata, conditions){
   counts <- (gene[,5:ncol(gene)])
   mean <- round(mean(as.numeric(counts)))
   
+  if(is.null(metadata)){
+    return()
+  }
   
   toplot <- metadata %>% mutate(counts = data.frame(t(counts))[,1])
   
@@ -271,123 +274,3 @@ principlePlot <- function(data, cond, genes, title, sub, cap){
       return(pca_plot)
 }
 
-
-erupt <- function(deg, lowcut, highcut, pcut, pop_score, lab_score, search, title, subtitle, caption){
-
-  startrows <- nrow(deg)
-  lowcut <- as.numeric(lowcut)
-  highcut <- as.numeric(highcut)
-  pcut <- as.numeric(pcut)
-  pop_score <- as.numeric(pop_score)
-  lab_score <- as.numeric(lab_score)
-  
-  #account for 0 pvalues
-  deg <- deg %>% mutate(padj = ifelse(padj == 0, 1e-300, padj))
-
-  if(length(search) < 1 || is.null(search)){
-    search <- c("NOTHING TO SEARCH")
-  }
-  
-  #set regulation col
-  deg <- deg %>% mutate(ex = case_when(
-    
-    gene_name %in% search ~ "FOUND",
-    
-    log2FoldChange > highcut & padj < pcut ~ "UP",
-    
-    log2FoldChange < lowcut & padj < pcut ~ "DOWN",
-    
-    .default = as.character("NO"))
-  )
-  
-  interest_gene <- NULL
-  if(!is.null(search) || search != c("NOTHING TO SEARCH")){
-    interest_gene <- deg %>% 
-      filter(ex == "FOUND") %>%
-      mutate(delabel = gene_name)
-    
-    deg <- deg %>% filter(ex != "FOUND")
-  }
-  
-  #sort by pval and fold change
-  deg <- deg %>% arrange(ex == "NO", padj, desc(abs(log2FoldChange)))
-  
-  deg <- head(deg, ((round(nrow(deg) * pop_score)) + 20) )
-  
-  #pick out and name
-  p_lab_score <- round(10 + (200 - 10) * lab_score)
-  l_lab_score <- round(5 + (30 - 5) * lab_score)
-  
-  p_top_genes <- head(deg %>% 
-                        filter(log2FoldChange <= lowcut | log2FoldChange >= highcut) %>% 
-                        arrange(padj) %>%
-                        pull(gene_name), p_lab_score)
-  
-  l_top_genes <- head(deg %>% 
-                        arrange(desc(abs(log2FoldChange))) %>% 
-                        pull(gene_name), l_lab_score)
-  
-  deg$delabel <- ifelse(
-    deg$gene_name %in% c(p_top_genes, l_top_genes),
-    deg$gene_name,
-    NA
-  )
-  
-  volcano <- ggplot(deg, aes(x = log2FoldChange, y = -log10(padj), color = ex, label = delabel)) +
-    geom_point(size=2) +
-    geom_text_repel(max.overlaps = Inf, na.rm=TRUE)+
-    
-    scale_x_continuous(breaks = seq(-35, 35, 2)) +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) + 
-    coord_cartesian() +
-    scale_color_manual(values = c("DOWN" = "#2171b5", "NO" = "grey", "UP" = "#bb0c00"),
-                       labels = c("DOWN" = "Downregulated", 
-                                  "NO" = "Not significant",
-                                  "UP" = "Upregulated")
-    ) +
-    geom_vline(xintercept = c(lowcut, highcut), color='black', linetype = 'dashed')+
-    geom_hline(yintercept= -log10(pcut), color='black', linetype='dashed') +
-    
-    labs(color = 'Genes', 
-         x = expression("logFC"), 
-         y = expression("-log"[10]*"p-value")) +
-    labs(title = title,
-         subtitle = subtitle) +
-    
-    labs(caption = paste0("Showing ", nrow(deg) + nrow(interest_gene), "/", startrows, " genes",
-                          "\n\n", caption)) +
-
-    theme_minimal() +
-    theme(plot.margin = margin(10, 10, 10, 10, "pt"),
-          axis.title.x = element_text(color='black', size = 20, margin = margin(15, 15, 15, 15, "pt")),
-          axis.title.y = element_text(color='black', size=20, margin = margin(15, 15, 15, 15, "pt")),
-          axis.text.y = element_text(color='black', size=15),
-          axis.text.x = element_text(color='black', size=15),
-          axis.line.x = element_line(color='grey'),
-          axis.line.y = element_line(color='grey'),
-          
-          legend.text = element_text(color='black', size=20),
-          legend.title = element_text(color='black', size=20),
-          legend.margin = margin(15, 15, 15, 15, "pt"),
-          
-          plot.title = element_text(color='black', size=30, margin=margin(20,20,5,10,"pt")),
-          plot.subtitle = element_text(color='black', size=20, margin=margin(5,5,15,10,"pt")),
-          plot.caption = element_text(color='black', size=15, margin=margin(10, 10, 10, 10, "pt"))
-    ) +
-    geom_point(data = interest_gene, 
-               aes(x = log2FoldChange, y = -log10(padj)), 
-               color='lawngreen',
-               size=3, 
-               show.legend = FALSE) +
-    geom_text_repel(data = interest_gene, 
-                    aes(x = log2FoldChange, 
-                        y = -log10(padj), 
-                        label = gene_name), 
-                    color='mediumseagreen',
-                    show.legend = FALSE) 
-  
-  
-  
-  return(volcano)
-  
-}

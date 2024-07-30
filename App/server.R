@@ -198,6 +198,8 @@ server <- function(input, output) {
   # - Displays an error if `metaData()` is NULL.
   # Notes:
   # - Locks out DEG upload option upon running DESeq2.
+    interaction_counter <- reactiveVal(0)
+    design_concat <- reactiveVal(NULL)
   # - Sets DESeq2 results and related objects as reactive values for further use.
     observeEvent(input$run_DESeq2, {
 
@@ -235,39 +237,120 @@ server <- function(input, output) {
         # ====== Reactive Assignment ======
         kill_deg(TRUE) 
         removeModal()
-
-        # Run DESeq2 process
-        metadata <- metaData()
-        countdata <- filtered_counts()
-
-        condition <- metadata[,1]
-
-        tryCatch({
-          
-          ddsc <- DESeqDataSetFromMatrix(countData = round(countdata), 
-                                        colData = metadata, 
-                                        design = ~ condition)
-
-          showModal(modalDialog("Running DESeq...", footer = NULL))
-
-          deseqdataset <- DESeq(ddsc)
-          
-          # ====== Reactive Assignment ======
-          ddsc(deseqdataset)
-          results_ddsc(data.frame(results(ddsc())))
-          vstObject <- vst(ddsc(), blind = TRUE)
-          normalized_counts(data.frame(counts(ddsc(), normalized = TRUE)))
-          vst_counts(data.frame(assay(vstObject)))
-          vst_Obj(vstObject)
-
-          showModal(modalDialog("DESeq complete with no fatal errors", easyClose = TRUE, footer = NULL))
-
-        }, error = function(e) {
-          
-          showErrorModal(paste("Error in DESeq2 process:", e$message))
         
+        #Design Creation A lot of parts / quite complex 
+        #----
+        vars <- colnames(metaData())
+        
+        output$inter_space <- renderUI({
+          if(interaction_counter() <= 0 ){
+            return()
+          }
+          lapply(1:interaction_counter(), function(i) {
+            createInteractionUI(i, vars)
+          })
         })
+        createInteractionsUI <- function(index, var){
+          fluidRow(
+            column(6, selectInput(paste0("interaction_", index, "_a"), 
+                                  paste("Interaction Term", index, "Variable 1:"), 
+                                  choices = choices)),
+            column(6, selectInput(paste0("interaction_", index, "_b"), 
+                                  paste("Interaction Term", index, "Variable 2:"), 
+                                  choices = choices))
+          )
+        }
+        
+        showModal(modalDialog(div(
+          p("Experimental design"),
+          renderText({design_concat()}),
+          checkboxGroupInput('dvars', 'Variables', choices = vars, inline = TRUE),
+          uiOutput("inter_space"),
+          actionButton('addinter', "Add interaction"),
+          actionButton('mininter', "Remove interaction"),
+          actionButton('design_submit', "RUN")
+        ),
+        easyClose = FALSE))
+        
+        refresh <- reactive({
+          invalidateLater(100)
+          Sys.time()
+        })
+        observeEvent(refresh(),{design_concat(concatDesign(input, output, session, interaction_counter()))})
+        observeEvent(input$addinter, {
+          interaction_counter(interaction_counter() + 1)
+        })
+        observeEvent(input$mininter, {
+          if(interaction_counter() > 0){
+            interaction_counter(interaction_counter() - 1)
+          }
+        })
+        concatDesign <- function(input, output, session, i){
+          
+          main_effects <- input$dvars
+          
+          dparts <- c(main_effects)
+          
+          if(i > 0){
+            for (j in 1:i) {
+              var1 <- input[[paste0("interaction_", j, "_a")]]
+              var2 <- input[[paste0("interaction_", j, "_b")]]
+              
+              # If both variables for the interaction are selected, add the interaction term
+              if (!is.null(var1) && !is.null(var2)) {
+                interaction_term <- paste(var1, var2, sep = ":")
+                dparts <- c(dparts, interaction_term)
+              }
+            }
+          }
+          
+          design_formula <- paste(dparts, collapse = " + ")
+          
+          return(design_formula)
+          
+        }
+        
+        #----
+        
+        observeEvent(input$design_submit,{
+        
+          # Run DESeq2 process
+          metadata <- metaData()
+          countdata <- filtered_counts()
 
+          # condition <- metadata[,1]
+
+          tryCatch({
+            
+            des <- paste0("~ ", design_concat())
+            des <- as.formula(des)
+            print(des)
+            
+            ddsc <- DESeqDataSetFromMatrix(countData = round(countdata),
+                                          colData = metadata,
+                                          design = des)
+
+            showModal(modalDialog("Running DESeq...", footer = NULL))
+
+            deseqdataset <- DESeq(ddsc)
+
+            # ====== Reactive Assignment ======
+            ddsc(deseqdataset)
+            results_ddsc(data.frame(results(ddsc())))
+            vstObject <- vst(ddsc(), blind = TRUE)
+            normalized_counts(data.frame(counts(ddsc(), normalized = TRUE)))
+            vst_counts(data.frame(assay(vstObject)))
+            vst_Obj(vstObject)
+
+            showModal(modalDialog("DESeq complete with no fatal errors", easyClose = TRUE, footer = NULL))
+
+          }, error = function(e) {
+
+            showErrorModal(paste("Error in DESeq2 process:", e$message))
+
+          })
+          
+        }, once = TRUE)
       }, once = TRUE) # `once = TRUE` ensures this observer is only triggered once per modal
     
     })

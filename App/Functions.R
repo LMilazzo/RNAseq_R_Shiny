@@ -1,6 +1,7 @@
 
 library(readr)
 library(dplyr)
+library(shiny)
 
 # Primitive function for displaying a modal that displays and error
 showErrorModal <- function(message) {
@@ -104,4 +105,5 @@ principlePlot <- function(data, cond, genes, title, sub, cap){
 
       return(pca_plot)
 }
+
 

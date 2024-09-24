@@ -28,7 +28,7 @@ options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
 ui <- navbarPage("DESeq2",  
    theme = shinytheme("cyborg"),
-   
+#----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 1----------------------------------#
 #-----------------------------File Upload-------------------------------#
@@ -394,6 +394,42 @@ ui <- navbarPage("DESeq2",
       )##XX##~~~Side Panel End~~~##XX##
 
     )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
+  ), ##XX##~~~Tab Panel Closing Bracket~~~##XX##
+#----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 8----------------------------------#
+#--------------------------Pathway Analysis-----------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
+tabPanel("Pathway Analysis",
+   fluidPage(
+     
+#_____________________________Side Bar__________________________________#
+      sidebarPanel(width = 3,
+        
+        actionButton("choosePathfindR_data", "Run Pathway Analysis"),
+        
+        HTML("<br><br>"),
+        HTML("<p>Uploaded data to run in pathfindR must include (Gene_symbol, logFC, P.val)</p>"),
+        #-----------------input----------------#
+        #-----------file_for_pathfindR---------#
+        #--------------------------------------#
+        # An upload file widget for the data for pathfindR
+        fileInput('file_for_pathfindR', 
+                  ''),
+        
+        HTML("<br>"),
+        HTML("<p>You can also upload a previous pathfindR experiment as long as it adheres to the same dataframe format you would recieve from pathfindR after clustering</p>"),
+        #-----------------input----------------#
+        #-----------pathfindR_data_file--------#
+        #--------------------------------------#
+        # An upload file widget for the pathfindR data
+        fileInput('pathfindR_data_file', 
+                  '')
+        
+      )
+     
+     
+   )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
   )##XX##~~~Tab Panel Closing Bracket~~~##XX##
 #----
 

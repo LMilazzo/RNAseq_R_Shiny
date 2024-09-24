@@ -1,0 +1,6 @@
+ID,Term_Description,Fold_Enrichment,occurrence,support,lowest_p,highest_p,non_Signif_Snw_Genes,Up_regulated,Down_regulated,all_pathway_genes,num_genes_in_path,Cluster,Status
+1,Pathway_1,2.5,3,10,0.001,0.05,2,5,3,20,10,A,Active
+2,Pathway_2,1.8,2,8,0.005,0.07,1,3,2,15,8,B,Inactive
+3,Pathway_3,3.2,4,12,0.0001,0.03,3,7,4,25,12,C,Active
+4,Pathway_4,1.6,2,7,0.01,0.08,2,4,3,18,9,D,Inactive
+5,Pathway_5,2,3,9,0.002,0.06,1,6,2,22,11,E,Active

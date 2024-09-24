@@ -5,7 +5,6 @@ server <- function(input, output) {
 #~~~~~######_____________Reactive Values______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #----
-#----
   # Determines when to run DESeq2
   run_question <- reactiveVal(NULL) 
   
@@ -35,11 +34,13 @@ server <- function(input, output) {
   
   # Variance stabilized counts from the vst_Obj
   vst_counts <- reactiveVal(NULL)
-#----
+
+#---- 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#----  
+#Differential Expression Things
+
   # Reading and Setting data from raw counts upload #----
   #----- Observe UI Event --------# 
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -222,138 +223,127 @@ server <- function(input, output) {
           p("If you have previously uploaded a DEG file, it will be scrapped from the application. All tables will display the new DESeq2 data, and visuals and graphs will also be updated accordingly.")
         ),
         footer = tagList(
-          actionButton('cancel', 'Cancel'),
-          actionButton('run', 'Run')
-        )
+          actionButton('proceedToDesign', 'Run')
+        ), easyClose = TRUE
       ))
-
-      # Observe cancel and run buttons
-      observeEvent(input$cancel, {
-        removeModal()
-      }, once = TRUE) # `once = TRUE` ensures this observer is only triggered once per modal
-
-      observeEvent(input$run, {
-
-        # ====== Reactive Assignment ======
-        kill_deg(TRUE) 
-        removeModal()
-        
-        #Design Creation A lot of parts / quite complex 
-        #----
-        vars <- colnames(metaData())
-        
-        output$inter_space <- renderUI({
-          if(interaction_counter() <= 0 ){
-            return()
-          }
-          lapply(1:interaction_counter(), function(i) {
-            createInteractionUI(i, vars)
-          })
-        })
-        createInteractionsUI <- function(index, var){
-          fluidRow(
-            column(6, selectInput(paste0("interaction_", index, "_a"), 
-                                  paste("Interaction Term", index, "Variable 1:"), 
-                                  choices = choices)),
-            column(6, selectInput(paste0("interaction_", index, "_b"), 
-                                  paste("Interaction Term", index, "Variable 2:"), 
-                                  choices = choices))
-          )
+    }) 
+    # Observe and run buttons
+    observeEvent(input$proceedToDesign, {
+      
+      
+      # ====== Reactive Assignment ======
+      #removeModal()
+      
+      #Design Creation A lot of parts / quite complex 
+      #----
+      vars <- colnames(metaData())
+      
+      output$inter_space <- renderUI({
+        if(interaction_counter() <= 0 ){
+          return()
         }
+        lapply(1:interaction_counter(), function(i) {
+          createInteractionUI(i, vars)
+        })
+      })
+      createInteractionUI <- function(index, vars){
+        fluidRow(
+          column(6, selectInput(paste0("interaction_", index, "_a"), 
+                                paste("Interaction Term", index, "Variable 1:"), 
+                                choices = vars)),
+          column(6, selectInput(paste0("interaction_", index, "_b"), 
+                                paste("Interaction Term", index, "Variable 2:"), 
+                                choices = vars))
+        )
+      }
+      observeEvent(refresh(),{design_concat(concatDesign(input, output, session, interaction_counter()))})
+      observeEvent(input$addinter, {
+        interaction_counter(interaction_counter() + 1)
+      })
+      observeEvent(input$mininter, {
+        if(interaction_counter() > 0){
+          interaction_counter(interaction_counter() - 1)
+        }
+      })
+      concatDesign <- function(input, output, session, i){
         
-        showModal(modalDialog(div(
-          p("Experimental design"),
-          renderText({design_concat()}),
-          checkboxGroupInput('dvars', 'Variables', choices = vars, inline = TRUE),
-          uiOutput("inter_space"),
-          actionButton('addinter', "Add interaction"),
-          actionButton('mininter', "Remove interaction"),
-          actionButton('design_submit', "RUN")
-        ),
-        easyClose = FALSE))
+        main_effects <- input$dvars
         
-        refresh <- reactive({
-          invalidateLater(100)
-          Sys.time()
-        })
-        observeEvent(refresh(),{design_concat(concatDesign(input, output, session, interaction_counter()))})
-        observeEvent(input$addinter, {
-          interaction_counter(interaction_counter() + 1)
-        })
-        observeEvent(input$mininter, {
-          if(interaction_counter() > 0){
-            interaction_counter(interaction_counter() - 1)
-          }
-        })
-        concatDesign <- function(input, output, session, i){
-          
-          main_effects <- input$dvars
-          
-          dparts <- c(main_effects)
-          
-          if(i > 0){
-            for (j in 1:i) {
-              var1 <- input[[paste0("interaction_", j, "_a")]]
-              var2 <- input[[paste0("interaction_", j, "_b")]]
-              
-              # If both variables for the interaction are selected, add the interaction term
-              if (!is.null(var1) && !is.null(var2)) {
-                interaction_term <- paste(var1, var2, sep = ":")
-                dparts <- c(dparts, interaction_term)
-              }
+        dparts <- c(main_effects)
+        
+        if(i > 0){
+          for (j in 1:i) {
+            var1 <- input[[paste0("interaction_", j, "_a")]]
+            var2 <- input[[paste0("interaction_", j, "_b")]]
+            
+            # If both variables for the interaction are selected, add the interaction term
+            if (!is.null(var1) && !is.null(var2)) {
+              interaction_term <- paste(var1, var2, sep = ":")
+              dparts <- c(dparts, interaction_term)
             }
           }
-          
-          design_formula <- paste(dparts, collapse = " + ")
-          
-          return(design_formula)
-          
         }
         
-        #----
+        design_formula <- paste(dparts, collapse = " + ")
         
-        observeEvent(input$design_submit,{
+        return(design_formula)
         
-          # Run DESeq2 process
-          metadata <- metaData()
-          countdata <- filtered_counts()
-
-          # condition <- metadata[,1]
-
-          tryCatch({
-            
-            des <- paste0("~ ", design_concat())
-            des <- as.formula(des)
-            print(des)
-            
-            ddsc <- DESeqDataSetFromMatrix(countData = round(countdata),
-                                          colData = metadata,
-                                          design = des)
-
-            showModal(modalDialog("Running DESeq...", footer = NULL))
-
-            deseqdataset <- DESeq(ddsc)
-
-            # ====== Reactive Assignment ======
-            ddsc(deseqdataset)
-            results_ddsc(data.frame(results(ddsc())))
-            vstObject <- vst(ddsc(), blind = TRUE)
-            normalized_counts(data.frame(counts(ddsc(), normalized = TRUE)))
-            vst_counts(data.frame(assay(vstObject)))
-            vst_Obj(vstObject)
-
-            showModal(modalDialog("DESeq complete with no fatal errors", easyClose = TRUE, footer = NULL))
-
-          }, error = function(e) {
-
-            showErrorModal(paste("Error in DESeq2 process:", e$message))
-
-          })
-          
-        }, once = TRUE)
-      }, once = TRUE) # `once = TRUE` ensures this observer is only triggered once per modal
-    
+      }
+      refresh <- reactive({
+        invalidateLater(100)
+        Sys.time()
+      })
+      
+      showModal(modalDialog(div(
+        p("Experimental design"),
+        renderText({design_concat()}),
+        checkboxGroupInput('dvars', 'Variables', choices = vars, inline = TRUE),
+        uiOutput("inter_space"),
+        actionButton('addinter', "Add interaction"),
+        actionButton('mininter', "Remove interaction"),
+      ),footer = tagList(actionButton('design_submit', "Run")), easyClose = TRUE))
     })
+    observeEvent(input$design_submit,{
+      kill_deg(TRUE) 
+      
+      # Run DESeq2 process
+      metadata <- metaData()
+      countdata <- filtered_counts()
+      
+      # condition <- metadata[,1]
+      
+      tryCatch({
+        
+        des <- paste0("~ ", design_concat())
+        des <- as.formula(des)
+        print(des)
+        
+        ddsc <- DESeqDataSetFromMatrix(countData = round(countdata),
+                                       colData = metadata,
+                                       design = des)
+        
+        showModal(modalDialog("Running DESeq...", footer = NULL))
+        
+        deseqdataset <- DESeq(ddsc)
+        
+        # ====== Reactive Assignment ======
+        ddsc(deseqdataset)
+        results_ddsc(data.frame(results(ddsc())))
+        vstObject <- vst(ddsc(), blind = TRUE)
+        normalized_counts(data.frame(counts(ddsc(), normalized = TRUE)))
+        vst_counts(data.frame(assay(vstObject)))
+        vst_Obj(vstObject)
+        
+        showModal(modalDialog("DESeq complete with no fatal errors", easyClose = TRUE, footer = NULL))
+        
+      }, error = function(e) {
+        
+        showErrorModal(paste("Error in DESeq2 process:", e$message))
+        
+      })
+      
+    })
+    
   #----
   # Handling a Case of running with DEG data #----
   #----- Observe UI Event --------# 
@@ -372,7 +362,7 @@ server <- function(input, output) {
   # - determines the status of what has been uploaded and processed PREVENTS reprocessing the same data
     degStatus <- reactiveVal(1)
     # 1 metadata has been uploaded waiting for DEG or no files uploaded
-    # 2 DEG has been uploaded wating for metadata
+    # 2 DEG has been uploaded waiting for metadata
     # 3 Both files are uploaded a file has potentially been changed
   # - determines whether or not this process is available to the user
     kill_deg <- reactiveVal(NULL)
@@ -414,7 +404,6 @@ server <- function(input, output) {
                   select( all_of(common_col) )
 
         # ====== Reactive Assignment ======
-        
         gene_names(df %>% select(gene_name, gene_id)) 
         
         #Check for duplicate ids
@@ -481,10 +470,120 @@ server <- function(input, output) {
       }
       
     })
+  #----
+
+#Pathway Analysis Things
   
-
-
-#----
+    # Running Pathway Analysis from the DEG and normal inputs #----
+    #----- Observe UI Event --------# 
+    #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+    #Will run pathway analysis with the default parameters assuming a
+    #human subject
+    #Requires that the DEG process be complete
+    #Errors:
+    # - Displays an Error if the DEG files needed dont exist yet
+    # 
+    # Data sources
+    previous_pathfindR_results <- reactiveVal(NULL)
+    min_info_file_for_pathfindR <- reactiveVal(NULL)
+    # Read Files
+    observeEvent(input$file_for_pathfindR,{
+      path <- input$file_for_pathfindR$datapath
+      
+      if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
+        showErrorModal("The file must be a csv or tsv")
+      }
+      if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
+        data <- read.csv(path, sep = "\t")
+      } else {
+        data <- read.csv(path)
+      }
+      
+      required <- c("Gene_symbol", "logFC", "P.val")
+      common <- intersect(required, colnames(data))
+      if( ! all(required %in% common) ){
+        showErrorModal("This file does not have the correct columns")
+        return()
+      }
+      
+      # ====== Reactive Values ======
+      min_info_file_for_pathfindR(data %>% select(Gene_symbol, logFC, P.val))
+      
+    })
+    observeEvent(input$pathfindR_data_file,{
+      path <- input$pathfindR_data_file$datapath
+      
+      if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
+        showErrorModal("The file must be a csv or tsv")
+      }
+      if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
+        data <- read.csv(path, sep = "\t")
+      } else {
+        data <- read.csv(path)
+      }
+      
+      required <- c("ID", "Term_Description", "Fold_Enrichment", "occurrence", "support", "lowest_p", 
+                    "highest_p", "non_Signif_Snw_Genes", "Up_regulated", "Down_regulated", 
+                    "all_pathway_genes", "num_genes_in_path", "Cluster", "Status")
+      
+      common <- intersect(required, colnames(data))
+      if( ! all(required %in% common) ){
+        showErrorModal("This file does not have the correct columns")
+        return()
+      }
+      
+      # ====== Reactive Values ======
+      previous_pathfindR_results(data %>% select(required))
+      
+    })
+    # After Run button
+    filesToChoose <- reactiveVal(NULL)
+    observeEvent(input$choosePathfindR_data,{
+  
+      #See what data has been uploaded to the session they can choose from
+      options_for_data <- list('DESeq2 Experiment Results (pg. 1-7)' = NULL, 'Uploaded DEG Results (pg.8)' = NULL, 'Uploaded Pathfinder Results (pg.8)' = NULL)
+      if( !is.null(results_ddsc()) ){
+        options_for_data[[1]] <-  results_ddsc()
+      }
+      if( !is.null(min_info_file_for_pathfindR()) ){
+        options_for_data[[2]] <- min_info_file_for_pathfindR()
+      }
+      if( !is.null(previous_pathfindR_results()) ){
+        options_for_data[[3]] <- previous_pathfindR_results()
+      }
+      
+      filesToChoose(options_for_data[!sapply(options_for_data, is.null)])
+      
+      if( length(filesToChoose())  < 1 ){
+        showErrorModal("No valid data sources have been uploaded")
+        return()
+      }
+      
+      showModal(modalDialog(div(
+          p("You may have multiple valid data sources."),
+          p("Which will you run pathway analysis with?"),
+          radioButtons('pathway_analysis_data_source','', choices = names(filesToChoose())),
+      ),
+      footer = tagList(
+        actionButton('runPathFinder', 'Run')
+      ),easyClose = TRUE))
+      
+    })
+    observeEvent(input$runPathFinder, {
+      removeModal()
+      runPathfindRFunc(filesToChoose()[input$pathway_analysis_data_source])
+    })
+    
+    # Function to actually run
+    runPathfindRFunc <- function(data_source){
+      print(data_source)
+    }
+    
+    #----
+    
+    
+    
+  
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -1101,5 +1200,5 @@ server <- function(input, output) {
    
   
 #----
-}#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
+} #X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
 

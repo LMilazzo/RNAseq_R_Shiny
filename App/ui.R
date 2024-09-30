@@ -4,7 +4,6 @@
 library(shiny)
 library(shinythemes)
 library(DT)
-library(plyr)
 library(dplyr)
 library(readr)
 source("Functions.R")
@@ -13,15 +12,15 @@ library(ggplot2)
 library(ggplotify)
 library(patchwork)
 library(matrixStats)
-library(S4Vectors)
 library(SummarizedExperiment)
 library(circlize)
 library(ComplexHeatmap)
 library(colourpicker)
-library(grid)
 library(ggbeeswarm)
 library(ggrepel)
 library(BioVis)
+library(pathfindR)
+library(tidyr)
 #----
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
@@ -368,7 +367,7 @@ ui <- navbarPage("DESeq2",
                     choices=c(1.0 ,0.5, 0.05, 0.01, 0.001), selected=0.05),
         
         #-----------------input----------------#
-        #----------------populat---------------#
+        #--------------population--------------#
         #--------------------------------------#
         # A slider to adjust the population of the graph
         sliderInput('volcano_pop', 
@@ -376,7 +375,7 @@ ui <- navbarPage("DESeq2",
                     min=0, max=1, value = 0.3, width='100%', ticks=FALSE),
         
         #-----------------input----------------#
-        #----------------label density---------#
+        #-------------label density------------#
         #--------------------------------------#
         # A slider to adjust the label population of the graph
         sliderInput('volcano_lab_density', 
@@ -400,7 +399,7 @@ ui <- navbarPage("DESeq2",
 #-------------------------------PAGE 8----------------------------------#
 #--------------------------Pathway Analysis-----------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
-tabPanel("Pathway Analysis",
+  tabPanel("Pathway Analysis",
    fluidPage(
      
 #_____________________________Side Bar__________________________________#
@@ -426,12 +425,67 @@ tabPanel("Pathway Analysis",
         fileInput('pathfindR_data_file', 
                   '')
         
+      ),
+#_____________________________Main Panel________________________________#
+      mainPanel(width = 9,
+        
+        
+        uiOutput('pathfinderPreview')
+                
+                
       )
+      
+    
      
      
    )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
-  )##XX##~~~Tab Panel Closing Bracket~~~##XX##
+  ),##XX##~~~Tab Panel Closing Bracket~~~##XX##
 #----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 8----------------------------------#
+#--------------------------Pathway Enrichment---------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
+  tabPanel("Term Enrichment",
+    fluidPage(
+      
+      uiOutput('enrichment_clusters_shown'),
+#_____________________________Side Bar__________________________________#
+      sidebarPanel(width = 3,
+      
+        #-----------------input----------------#
+        #--------------gene_to_search----------#
+        #--------------------------------------#
+        # A text input later converted to vector of genes to highlight
+        textInput('enrichment_genes',
+                  'Genes to include in the enrichment chart',
+                  value=NULL),
+        
+        #-----------------input----------------#
+        #--------------gene_to_search----------#
+        #--------------------------------------#
+        # A text input later converted to vector of genes to highlight
+        textInput('enrichment_paths',
+                  'Pathway terms to be included in the enrichment chart',
+                  value=NULL),
+        
+        #-----------------input----------------#
+        #--------------gene_to_search----------#
+        #--------------------------------------#
+        # A text input later converted to vector of genes to highlight
+        textInput('enrichment_clusters',
+                  'Specific clusters to view in the enrichment chart',
+                  value=NULL)
+      
+      ), ##XX##~~~Side Panel End~~~##XX##
+
+#_____________________________Main Panel________________________________#
+      mainPanel(width = 9,
+                
+        uiOutput('enrichmentUI')
+        
+      ),
+    )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
+  )##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
    

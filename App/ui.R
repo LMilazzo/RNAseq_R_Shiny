@@ -474,7 +474,12 @@ ui <- navbarPage("DESeq2",
         # A text input later converted to vector of genes to highlight
         textInput('enrichment_clusters',
                   'Specific clusters to view in the enrichment chart',
-                  value=NULL)
+                  value=NULL),
+        
+        uiOutput('pathwaysDT'),
+        
+        uiOutput('genes_in_paths_DT')
+        
       
       ), ##XX##~~~Side Panel End~~~##XX##
 

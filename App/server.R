@@ -1290,6 +1290,45 @@ server <- function(input, output) {
       
     })
     
+    output$pathwaysDT <- renderUI({
+      if( is.null(pathfinder_data()) ){
+        return()
+      }
+      
+      data <- pathfinder_data() %>% select(Term_Description)
+      renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
+    })
+    
+    output$genes_in_paths_DT <- renderUI({
+      if( is.null(pathfinder_data()) ){
+        return()
+      }
+      
+      data <- pathfinder_data() %>%
+        mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
+        select(gene_list)
+      
+      dataDF <- c()
+      
+      
+      for(i in 1:nrow(data) ){
+        dataDF <- c(dataDF, unlist(data[i,1]))
+      }
+      
+      
+      data <- data.frame(genes = dataDF)
+      
+      data <- data %>% 
+        group_by(genes) %>%
+        mutate(in_n_pathways = n()) %>% 
+        distinct(genes, .keep_all = TRUE) %>%
+        arrange(desc(in_n_pathways))
+      
+      renderDT({data}, rownames = FALSE, options = list(pageLength = 7))
+      
+    })
+    
+    
   
   #______________________________Page 9____________________________
     enrichment_plot_height_px <- reactiveVal(450)
@@ -1326,7 +1365,14 @@ server <- function(input, output) {
       plot <- enricher(pathfinder_data(), 
                        search_clusters,
                        search_genes,
-                       search_paths)
+                       search_paths) 
+      
+      plot <- plot +
+        theme(axis.text.y = element_text(size = 17),
+              axis.text.x = element_text(size = 15),
+              legend.text = element_text(size = 15),
+              legend.title = element_text(size = 15),
+              strip.text = element_text(size = 15))
       
       hits <- plot$data
       enrichment_plot_height_px(paste0(nrow(hits) * 23, "px"))

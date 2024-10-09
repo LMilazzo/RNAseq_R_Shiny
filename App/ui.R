@@ -21,12 +21,16 @@ library(ggrepel)
 library(BioVis)
 library(pathfindR)
 library(tidyr)
+library(shinyjs)
+library(plotly)
+library(htmlwidgets)
 #----
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
 ui <- navbarPage("DESeq2",  
    theme = shinytheme("cyborg"),
+   useShinyjs(),
 #----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #-------------------------------PAGE 1----------------------------------#
@@ -442,7 +446,7 @@ ui <- navbarPage("DESeq2",
   ),##XX##~~~Tab Panel Closing Bracket~~~##XX##
 #----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#-------------------------------PAGE 8----------------------------------#
+#-------------------------------PAGE 9----------------------------------#
 #--------------------------Pathway Enrichment---------------------------#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
   tabPanel("Term Enrichment",
@@ -476,9 +480,9 @@ ui <- navbarPage("DESeq2",
                   'Specific clusters to view in the enrichment chart',
                   value=NULL),
         
-        uiOutput('pathwaysDT'),
+        uiOutput('pathwaysDT9'),
         
-        uiOutput('genes_in_paths_DT')
+        uiOutput('genes_in_paths_DT9')
         
       
       ), ##XX##~~~Side Panel End~~~##XX##
@@ -488,12 +492,55 @@ ui <- navbarPage("DESeq2",
                 
         uiOutput('enrichmentUI')
         
-      ),
+      )
     )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
+  ), ##XX##~~~Tab Panel Closing Bracket~~~##XX##
+#----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 10---------------------------------#
+#--------------------------Pathway Heatmaps-----------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
+  tabPanel("Term Gene Heatmap",
+   fluidPage(
+#_____________________________Side Bar__________________________________#
+     sidebarPanel(width = 3,
+      
+        uiOutput('open_in_new_tab10'), 
+        
+        #-----------------input----------------#
+        #--------------gene_to_search----------#
+        #--------------------------------------#
+        # A text input later converted to vector of genes to highlight
+        textInput('pathway_heatmap_genes',
+                  'Genes to include in the heatmap chart',
+                  value=NULL),
+        
+        #-----------------input----------------#
+        #--------------gene_to_search----------#
+        #--------------------------------------#
+        # A text input later converted to vector of genes to highlight
+        textInput('heatmap_paths',
+                  'Pathway terms to be included in the heatmap chart',
+                  value=NULL),
+    
+        uiOutput('pathwaysDT10'),
+        
+        uiOutput('genes_in_paths_DT10')
+                  
+                  
+     ), ##XX##~~~Side Panel End~~~##XX##
+     
+#_____________________________Main Panel________________________________#
+     mainPanel(width = 9,
+               
+        uiOutput('pathway_heatmap')
+               
+     )
+   )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
   )##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
-   
-   
-     
-            
+
+
+
+

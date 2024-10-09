@@ -658,9 +658,6 @@ server <- function(input, output) {
     
   }
   #----
-    
-    
-    
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
@@ -1084,10 +1081,10 @@ server <- function(input, output) {
         lapply(input$heatmap_cond, function(cond) {
           
           div(
-            colourInput(inputId = paste0("color1_", cond),
+            colourpicker::colourInput(inputId = paste0("color1_", cond),
                       label = paste("Choose color1 for", cond),
                       value = "grey"),
-            colourInput(inputId = paste0("color2_", cond),
+            colourpicker::colourInput(inputId = paste0("color2_", cond),
                         label = paste("Choose color2 for", cond),
                         value = "blue")
           )
@@ -1289,48 +1286,8 @@ server <- function(input, output) {
       renderDT({data}, rownames = FALSE)
       
     })
-    
-    output$pathwaysDT <- renderUI({
-      if( is.null(pathfinder_data()) ){
-        return()
-      }
-      
-      data <- pathfinder_data() %>% select(Term_Description)
-      renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
-    })
-    
-    output$genes_in_paths_DT <- renderUI({
-      if( is.null(pathfinder_data()) ){
-        return()
-      }
-      
-      data <- pathfinder_data() %>%
-        mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
-        select(gene_list)
-      
-      dataDF <- c()
-      
-      
-      for(i in 1:nrow(data) ){
-        dataDF <- c(dataDF, unlist(data[i,1]))
-      }
-      
-      
-      data <- data.frame(genes = dataDF)
-      
-      data <- data %>% 
-        group_by(genes) %>%
-        mutate(in_n_pathways = n()) %>% 
-        distinct(genes, .keep_all = TRUE) %>%
-        arrange(desc(in_n_pathways))
-      
-      renderDT({data}, rownames = FALSE, options = list(pageLength = 7))
-      
-    })
-    
-    
   
-  #______________________________Page 9____________________________
+  #______________________________Page 9____________________________#----
     enrichment_plot_height_px <- reactiveVal(450)
     
     output$enrichmentChart <- renderPlot({
@@ -1406,6 +1363,168 @@ server <- function(input, output) {
                     value = round(1 + (0.15 * max(pathfinder_data()$Cluster))))
       }
     })
+    
+    output$pathwaysDT9 <- renderUI({
+      if( is.null(pathfinder_data()) ){
+        return()
+      }
+      
+      data <- pathfinder_data() %>% select(Term_Description)
+      renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
+    })
+    
+    output$genes_in_paths_DT9 <- renderUI({
+      if( is.null(pathfinder_data()) ){
+        return()
+      }
+      
+      data <- pathfinder_data() %>%
+        mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
+        select(gene_list)
+      
+      dataDF <- c()
+      
+      
+      for(i in 1:nrow(data) ){
+        dataDF <- c(dataDF, unlist(data[i,1]))
+      }
+      
+      
+      data <- data.frame(genes = dataDF)
+      
+      data <- data %>% 
+        group_by(genes) %>%
+        mutate(in_n_pathways = n()) %>% 
+        distinct(genes, .keep_all = TRUE) %>%
+        arrange(desc(in_n_pathways))
+      
+      renderDT({data}, rownames = FALSE, options = list(pageLength = 7))
+      
+    })
+    
+  #______________________________Page 10___________________________#----
+  
+    plot10 <- reactiveVal(NULL)
+    observeEvent(input$pathway_heatmap_genes,{
+      if(nchar(input$pathway_heatmap_genes) > 0){
+        shinyjs::hide('heatmap_paths')
+      }else{
+        shinyjs::show('heatmap_paths')
+      }
+    })
+    observeEvent(input$heatmap_paths,{
+      if(nchar(input$heatmap_paths) > 0){
+        shinyjs::hide('pathway_heatmap_genes')
+      }else{
+        shinyjs::show('pathway_heatmap_genes')
+      }
+    })
+    observeEvent(input$open_in_new_tab10, {
+      
+      saveWidget(plot10(), 'plot.html')
+      browseURL('plot.html')
+      
+    })
+    
+    output$open_in_new_tab10 <- renderUI({
+      
+      if(is.null(pathfinder_data())){
+        return()
+      }
+      
+      actionButton('open_in_new_tab10', 
+                   "Open in new tab")    
+    })
+    
+    output$pathwaysDT10 <- renderUI({
+      if( is.null(pathfinder_data()) ){
+        return()
+      }
+      
+      data <- pathfinder_data() %>% select(Term_Description)
+      renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
+    })
+    
+    output$genes_in_paths_DT10 <- renderUI({
+      if( is.null(pathfinder_data()) ){
+        return()
+      }
+      
+      data <- pathfinder_data() %>%
+        mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
+        select(gene_list)
+      
+      dataDF <- c()
+      
+      
+      for(i in 1:nrow(data) ){
+        dataDF <- c(dataDF, unlist(data[i,1]))
+      }
+      
+      
+      data <- data.frame(genes = dataDF)
+      
+      data <- data %>% 
+        group_by(genes) %>%
+        mutate(in_n_pathways = n()) %>% 
+        distinct(genes, .keep_all = TRUE) %>%
+        arrange(desc(in_n_pathways))
+      
+      renderDT({data}, rownames = FALSE, options = list(pageLength = 7))
+      
+    })
+    
+    output$pathway_heatmap <- renderUI({
+      
+      if(is.null(pathfinder_data())){
+        return(span("No Data Yet",style="color: red;"))
+      }
+      
+      genes <- input$pathway_heatmap_genes
+      pathways <- input$heatmap_paths
+      plot <- NULL
+      
+      if(nchar(genes) > 0){
+        genes <- strsplit(genes, ",")[[1]]
+        genes <- trimws(genes)
+        plot <- geneheatmap(pathfinder_data(), genes)
+      }
+      else if(nchar(pathways) > 0){
+        
+        if(grepl("^[1-9][0-9]*$", pathways)){
+          pathways <- as.numeric(pathways)
+        }else{
+          pathways <- strsplit(pathways, ",")[[1]]
+          pathways <- trimws(pathways)
+        }
+        
+        plot <- pathwayheatmap(pathfinder_data(), pathways)
+        
+      }
+      else{
+        plot <- pathwayheatmap(pathfinder_data(), 5)
+      }
+     
+      plot10(plot[[2]])
+      
+      output$plot <- renderPlot({
+        plot[[1]] +
+          theme(
+            axis.text.y = element_text(size = 15),
+            axis.text.x = element_text(size = 15),
+            legend.text = element_text(size = 10),
+            legend.title = element_text(size = 10)
+          ) +
+          scale_x_discrete(position = 'top')
+      }) 
+      
+      plotOutput('plot', 
+                 width = paste0(plot[[2]]$x$layout$width + 200, "px"), 
+                 height = paste0(plot[[2]]$x$layout$height + 200, "px"))
+      
+      
+    })
+    
     
 #----
 } #X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

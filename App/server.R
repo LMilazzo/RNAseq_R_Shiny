@@ -38,6 +38,8 @@ server <- function(input, output) {
   # Pathfinder results
   pathfinder_data <- reactiveVal(NULL)
 
+  abundance_data <- reactiveVal(NULL)
+  
 #---- 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -489,6 +491,33 @@ server <- function(input, output) {
   previous_pathfindR_results <- reactiveVal(NULL)
   min_info_file_for_pathfindR <- reactiveVal(NULL)
   # Read Files
+  observeEvent(input$pathfinder_abundance_data, {
+    path <- input$pathfinder_abundance_data$datapath
+    
+    if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
+      showErrorModal("The file must be a csv or tsv")
+    }
+    if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
+      data <- read.csv(path, sep = "\t")
+    } else {
+      data <- read.csv(path)
+    }
+    
+    # Process sample columns
+    sample_columns <- data[, grep("^\\.", colnames(data), value = TRUE)] # all columns starting with '.'
+    
+    if (ncol(sample_columns) == 0) {
+      showErrorModal("Warning No sample columns found with proper indicator, sample columns must start with '.'")
+      return()
+    }
+    
+    gene_names <- data %>% select(gene_names)
+    
+    abundance <- sample_columns %>% cbind(gene_names) %>% tibble::column_to_rownames('gene_names')
+    
+    abundance_data(abundance)
+    
+  })
   observeEvent(input$file_for_pathfindR,{
   path <- input$file_for_pathfindR$datapath
   
@@ -508,8 +537,26 @@ server <- function(input, output) {
     return()
   }
   
+  # Process sample columns
+  sample_columns <- data[, grep("^\\.", colnames(data), value = TRUE)] # all columns starting with '.'
+  gene_symbols <- data %>% select(Gene_symbol)
+
+  ab <- gene_symbols %>% 
+    cbind(sample_columns) %>% 
+    tibble::column_to_rownames('Gene_symbol')
+  
   # ====== Reactive Values ======
   min_info_file_for_pathfindR(data %>% select(Gene_symbol, logFC, P.val))
+  
+  if(ncol(ab) < 2){
+    abundance_data(NULL)
+    showErrorModal("Warning: There was not enough abundance data provided, proceeding without it...")
+  }else{
+    if(is.null(abundance_data())){
+      abundance_data(ab)
+    }
+  }
+  return()
   
 })
   observeEvent(input$pathfindR_data_file,{
@@ -537,6 +584,8 @@ server <- function(input, output) {
   # ====== Reactive Values ======
   previous_pathfindR_results(data %>% select(required))
   
+  showErrorModal("If you wish to use this file you may want to upload abundance data below!")
+  
 })
   filesToChoose <- reactiveVal(NULL)
   #----
@@ -560,7 +609,7 @@ server <- function(input, output) {
     if( !is.null(previous_pathfindR_results()) ){
       options_for_data[[3]] <- previous_pathfindR_results()
     }
-    
+    print(options_for_data)
     filesToChoose(options_for_data[!sapply(options_for_data, is.null)])
     
     if( length(filesToChoose())  < 1 ){
@@ -602,11 +651,20 @@ server <- function(input, output) {
       
       names(data) <- c('Gene_symbol', 'logFC', 'Padj')
       
+      x <- as.data.frame(filtered_counts()) %>%
+        mutate(gene_id = rownames(filtered_counts())) %>%
+        left_join(gene_names()) %>%
+        select(-gene_id) %>% 
+        tibble::column_to_rownames('gene_name')
+      
+      abundance_data(x)
       
     } else
     if( name == options[2]){
       
       data <- data.frame(data_source[[1]]) %>% select(Gene_symbol, logFC, P.val)
+      
+      
       
     } else
     if( name == options[3]){
@@ -1279,7 +1337,17 @@ server <- function(input, output) {
     output$pathfinderPreview <- renderUI({
       
       if( is.null(pathfinder_data()) ){
-        return(span("No Data Yet",style="color: red;"))
+        return(
+          div(
+            h2("Pathway analysis instructions:"),
+            p("Pathway analysis will be run using the pathfindR R package. There are three ways this can be started to yield visuals in this application:"),
+            p("1.) Use the results from your differential gene expression analysis in previous pages. If this method is used abundance data will be pulled in from a filtered version of your uploaded salmon counts matrix. This method does not require any file uploads on this page. "),
+            p("2.) If you have differential gene expression results and just want to go through pathway analysis you can upload them on this page with the required columns (Gene_symbol, P.val, logFC). Additionally, of you wish to upload abundance data you can append the samples as extra columns to this file with the prefix '.' so they can be found easily ex: (Gene_symbol, P.val, logFC, .Sample1, .Sample2). If you have a raw counts file that can be uploaded on this page as an alternative to appending the extra rows. Note that the pathway analysis will work if you uploaded differential gene expression results on page 2, but abundance data on that upload requires normalized counts so the abundance data will not be used for pathway analysis to get around this upload the data on this page instead."), 
+            p("3.) If you have a file with data from a pathfindR session that has previously been run then you can upload that on this page to revisit the data visuals and information. This file must hold clustered data from a pathfindR session, specifically the resulting dataframe from running the cluster_enriched_terms() function on results from the pathfinder package. If you wish to add abundance data with this method upload the data on this page."),
+            h3("Meta data and conditions:"),
+            p("For the best experience return to pg.1 and upload a file containing metadata for the samples in your experiment. Sample names must match the sample names in any form of abundance data you upload.")
+          )
+        )
       }
       
       data <- pathfinder_data() %>% select(-ID, -Up_regulated,	-Down_regulated, -all_pathway_genes)
@@ -1332,7 +1400,7 @@ server <- function(input, output) {
               strip.text = element_text(size = 15))
       
       hits <- plot$data
-      enrichment_plot_height_px(paste0(nrow(hits) * 23, "px"))
+      enrichment_plot_height_px(paste0(450 + nrow(hits) * 23, "px"))
       print(enrichment_plot_height_px())
       
       plot
@@ -1525,6 +1593,27 @@ server <- function(input, output) {
       
     })
     
+  #______________________________Page 11___________________________#----
+  
+    
+    output$stuff <- renderPlot({
+      score_terms(
+        enrichment_table = pathfinder_data(),
+        exp_mat = data.framse(abundance_data()),
+        cases= c('.T96.s4', '.T96.s5', '.T96.s6' ),
+        use_description = TRUE, # default FALSE
+        label_samples = TRUE, # default = TRUE
+        #case_title = "RA", # default = "Case"
+        #control_title = "Healthy", # default = "Control"
+        low = "#f7797d", # default = "green"
+        mid = "#fffde4", # default = "black"
+        high = "#1f4037" # default = "red"
+      )
+    })
+    
+    output$bsexample <- renderUI({
+      plotOutput('stuff')
+    })
     
 #----
 } #X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

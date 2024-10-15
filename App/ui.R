@@ -412,7 +412,7 @@ ui <- navbarPage("DESeq2",
         actionButton("choosePathfindR_data", "Run Pathway Analysis"),
         
         HTML("<br><br>"),
-        HTML("<p>Uploaded data to run in pathfindR must include (Gene_symbol, logFC, P.val)</p>"),
+        HTML("<p>Diffrentially expressed genes data (Gene_symbol, logFC, P.val)</p>"),
         #-----------------input----------------#
         #-----------file_for_pathfindR---------#
         #--------------------------------------#
@@ -421,13 +421,22 @@ ui <- navbarPage("DESeq2",
                   ''),
         
         HTML("<br>"),
-        HTML("<p>You can also upload a previous pathfindR experiment as long as it adheres to the same dataframe format you would recieve from pathfindR after clustering</p>"),
+        HTML("<p>Previous Pathway Analysis in PathfindR Experiment</p>"),
         #-----------------input----------------#
         #-----------pathfindR_data_file--------#
         #--------------------------------------#
         # An upload file widget for the pathfindR data
         fileInput('pathfindR_data_file', 
+                  ''),
+        HTML("<br>"),
+        HTML("<p>Abundance data/sample counts may be used for some of the pathway analysis process. This data can be derived from an upload here or a raw counts upload pg.1 . The upload on this page is prioritized for further analysis if uploaded, otherwise a previous upload may be used.</p>"),
+        #-----------------input----------------#
+        #-----------abundance_data_file--------#
+        #--------------------------------------#
+        # An upload file widget for the abundance data
+        fileInput('abundance_data_file', 
                   '')
+        
         
       ),
 #_____________________________Main Panel________________________________#
@@ -537,8 +546,20 @@ ui <- navbarPage("DESeq2",
                
      )
    )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
-  )##XX##~~~Tab Panel Closing Bracket~~~##XX##
+  ),##XX##~~~Tab Panel Closing Bracket~~~##XX##
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#-------------------------------PAGE 10---------------------------------#
+#--------------------------Pathway Heatmaps-----------------------------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
+tabPanel("example",
+   fluidPage(
+    
+     uiOutput('bsexample')
+     
+   )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
+  )##XX##~~~Tab Panel Closing Bracket~~~##XX##
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
 
 

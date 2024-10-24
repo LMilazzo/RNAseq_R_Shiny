@@ -36,9 +36,10 @@ server <- function(input, output) {
   vst_counts <- reactiveVal(NULL)
   
   # Pathfinder results
-  pathfinder_data <- reactiveVal(NULL)
+  pathfinder_results <- reactiveVal(NULL)
 
-  abundance_data <- reactiveVal(NULL)
+  # Pathfinder old experiment uploads
+  pathfinder_abundance_data <- reactiveVal(NULL)
   
 #---- 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -479,203 +480,143 @@ server <- function(input, output) {
 
 #Pathway Analysis Things
   
-  # Data sources and options #----
-  #----- Observe UI Event --------# 
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  #Will give options for which files have been uploaded and which will be used 
-  #for the analysis
-  #Errors:
-  # - Displays an Error if the DEG files needed dont exist yet
-  # 
-  # Data sources
-  previous_pathfindR_results <- reactiveVal(NULL)
-  min_info_file_for_pathfindR <- reactiveVal(NULL)
-  # Read Files
-  observeEvent(input$pathfinder_abundance_data, {
-    path <- input$pathfinder_abundance_data$datapath
+  #Choose how to run
+  observeEvent(input$Run_pathfinder, {
     
-    if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
-      showErrorModal("The file must be a csv or tsv")
+    if( is.null( results_ddsc() )){
+      showErrorModal('No diffrentially expressed gene experiment has been completed')
+    }else{
+      
+      data <- results_ddsc() %>% 
+        tibble::rownames_to_column(var = 'gene_id') %>%
+        left_join(gene_names())  %>%
+        select(Gene_symbol = gene_name, logFC = log2FoldChange, Padj = padj) %>%
+        filter(!is.na(Padj))
+
+        
+      # ====== Reactive Values ======
+      pathfinder_abundance_data(normalized_counts() %>% 
+                                  tibble::rownames_to_column(var = 'Gene_symbol'))
+      
+      runPathfindRFunc(data)
+      
     }
-    if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
-      data <- read.csv(path, sep = "\t")
-    } else {
-      data <- read.csv(path)
-    }
-    
-    # Process sample columns
-    sample_columns <- data[, grep("^\\.", colnames(data), value = TRUE)] # all columns starting with '.'
-    
-    if (ncol(sample_columns) == 0) {
-      showErrorModal("Warning No sample columns found with proper indicator, sample columns must start with '.'")
-      return()
-    }
-    
-    gene_names <- data %>% select(gene_names)
-    
-    abundance <- sample_columns %>% cbind(gene_names) %>% tibble::column_to_rownames('gene_names')
-    
-    abundance_data(abundance)
     
   })
-  observeEvent(input$file_for_pathfindR,{
-  path <- input$file_for_pathfindR$datapath
-  
-  if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
-    showErrorModal("The file must be a csv or tsv")
-  }
-  if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
-    data <- read.csv(path, sep = "\t")
-  } else {
-    data <- read.csv(path)
-  }
-  
-  required <- c("Gene_symbol", "logFC", "P.val")
-  common <- intersect(required, colnames(data))
-  if( ! all(required %in% common) ){
-    showErrorModal("This file does not have the correct columns")
-    return()
-  }
-  
-  # Process sample columns
-  sample_columns <- data[, grep("^\\.", colnames(data), value = TRUE)] # all columns starting with '.'
-  gene_symbols <- data %>% select(Gene_symbol)
-
-  ab <- gene_symbols %>% 
-    cbind(sample_columns) %>% 
-    tibble::column_to_rownames('Gene_symbol')
-  
-  # ====== Reactive Values ======
-  min_info_file_for_pathfindR(data %>% select(Gene_symbol, logFC, P.val))
-  
-  if(ncol(ab) < 2){
-    abundance_data(NULL)
-    showErrorModal("Warning: There was not enough abundance data provided, proceeding without it...")
-  }else{
-    if(is.null(abundance_data())){
-      abundance_data(ab)
-    }
-  }
-  return()
-  
-})
-  observeEvent(input$pathfindR_data_file,{
-  path <- input$pathfindR_data_file$datapath
-  
-  if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
-    showErrorModal("The file must be a csv or tsv")
-  }
-  if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
-    data <- read.csv(path, sep = "\t")
-  } else {
-    data <- read.csv(path)
-  }
-  
-  required <- c("ID", "Term_Description", "Fold_Enrichment", "occurrence", "support", "lowest_p", 
-                "highest_p", "non_Signif_Snw_Genes", "Up_regulated", "Down_regulated", 
-                "all_pathway_genes", "num_genes_in_path", "Cluster", "Status")
-  
-  common <- intersect(required, colnames(data))
-  if( ! all(required %in% common) ){
-    showErrorModal("This file does not have the correct columns")
-    return()
-  }
-  
-  # ====== Reactive Values ======
-  previous_pathfindR_results(data %>% select(required))
-  
-  showErrorModal("If you wish to use this file you may want to upload abundance data below!")
-  
-})
-  filesToChoose <- reactiveVal(NULL)
-  #----
-  # Running pathfinder and setting the data to a values #----
-  #----- Observe UI Event --------# 
-  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-  # Runs pathfinder with the input source of choosing and assuming the pin KEGG
-  #Errors:
-  # - Displays an Error if there is an error in the DEGG process
-  # 
-  observeEvent(input$choosePathfindR_data,{
-
-    #See what data has been uploaded to the session they can choose from
-    options_for_data <- list('DESeq2 Experiment Results (pg. 1-7)' = NULL, 'Uploaded DEG Results (pg.8)' = NULL, 'Uploaded Pathfinder Results (pg.8)' = NULL)
-    if( !is.null(results_ddsc()) ){
-      options_for_data[[1]] <-  results_ddsc()
-    }
-    if( !is.null(min_info_file_for_pathfindR()) ){
-      options_for_data[[2]] <- min_info_file_for_pathfindR()
-    }
-    if( !is.null(previous_pathfindR_results()) ){
-      options_for_data[[3]] <- previous_pathfindR_results()
-    }
-    print(options_for_data)
-    filesToChoose(options_for_data[!sapply(options_for_data, is.null)])
-    
-    if( length(filesToChoose())  < 1 ){
-      showErrorModal("No valid data sources have been uploaded")
-      return()
-    }
-    
-    showModal(modalDialog(div(
-        p("You may have multiple valid data sources."),
-        p("Which will you run pathway analysis with?"),
-        radioButtons('pathway_analysis_data_source','', choices = names(filesToChoose())),
-    ),
-    footer = tagList(
-      actionButton('runPathFinder', 'Run')
-    ),easyClose = TRUE))
+  observeEvent(input$Run_pathfinder_new_data, {
+    #uploads
+    showModal(
+      modalDialog(
+       
+        div( 
+        
+          HTML('<p>(csv or tsv) containing (ID,	Term_Description,	Fold_Enrichment, occurrence, support,	lowest_p,	highest_p,	non_Signif_Snw_Genes,	Up_regulated,	Down_regulated,	all_pathway_genes,	num_genes_in_path,	Cluster, Status,)</p>'),
+          HTML('<br>This is the standard output from a pathfindR clustered experiment.'),
+          fileInput('pathfinder_new_data', 'Pathway Information'),
+        
+          HTML('<p>Normalized count data includes (gene_name) and samples where each sample name starts with "."</p>'),
+          fileInput('pathfinder_new_abundance', 'Abundance Data')
+        
+        ), footer = modalButton("Finish")
+        
+      )
+    )  
     
   })
-  observeEvent(input$runPathFinder, {
-    removeModal()
-    runPathfindRFunc(filesToChoose()[input$pathway_analysis_data_source] )
+  #Reading new files
+  observeEvent(input$pathfinder_new_data,{
+    
+    if(!is.null(input$pathfinder_new_data)){
+      
+      path <- input$pathfinder_new_data$datapath
+      
+      if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
+        showErrorModal('An unreadable file type was submitted (use csv or tsv)')
+        return()
+      }
+      
+      if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
+        new_data <- read.csv(path, sep = "\t")
+      } else {
+        new_data <- read.csv(path)
+      }
+      
+      req_cols <- c("ID","Term_Description","Fold_Enrichment","occurrence",
+                    "support","lowest_p","highest_p","non_Signif_Snw_Genes",
+                    "Up_regulated","Down_regulated","all_pathway_genes",
+                    "num_genes_in_path","Cluster","Status")
+      
+      if(!all(req_cols %in% colnames(new_data))){
+        showErrorModal('There are some missing cols in the uploaded set')
+        return()
+      }
+      
+      types <- c("numeric", "character", "numeric",
+                 "numeric", "numeric", "numeric",
+                 "numeric", "character", "character",
+                 "character", "character", "numeric",
+                 "numeric", "character")
+      check <- new_data %>% select(ID, Term_Description, Fold_Enrichment,
+                              occurrence, support, lowest_p,
+                              highest_p, non_Signif_Snw_Genes, Up_regulated,
+                              Down_regulated, all_pathway_genes, num_genes_in_path,
+                              Cluster, Status)
+      check <- sapply(new_data, class)
+      
+      if(!sum(types == check) == 14){
+        showErrorModal('Incorrect column class types')
+        return()
+      }
+      
+      #To DO
+      #Additional checks to see if correct data types
+      
+      # ====== Reactive Values ======
+      pathfinder_results(new_data)
+      
+    }
+  })
+  observeEvent(input$pathfinder_new_abundance, {
+    
+    if(!is.null(input$pathfinder_new_abundance)){
+      
+      path <- input$pathfinder_new_abundance$datapath
+      
+      if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
+        showErrorModal('An unreadable file type was submitted (use csv or tsv)')
+        return()
+      }
+      
+      if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
+        new_abun <- read.csv(path, sep = "\t")
+      } else {
+        new_abun <- read.csv(path)
+      }
+      
+      if(! 'gene_name' %in% colnames(new_abun)){
+        showErrorModal('there must be a column gene_name containing unique gene names')
+        return()
+      }
+      
+      genes <- new_abun %>% select(gene_name)
+      
+      # ====== Reactive Values ======
+      gene_names(genes)
+      
+      samplecol <- grep("^\\.", colnames(new_abun), value = TRUE)
+      
+      if(length(samplecol) < 2){
+        showErrorModal('Not enough samples found')
+        return()
+      }
+      
+      pathfinder_abundance_data(new_abun)
+      
+    }
   })
   # Function to actually run
   runPathfindRFunc <- function(data_source){
-    
-    name <- names(data_source)
-    
-    options <- c('DESeq2 Experiment Results (pg. 1-7)',
-                 'Uploaded DEG Results (pg.8)',
-                 'Uploaded Pathfinder Results (pg.8)')
-    
-    if( name == options[1]){
-      
-      data <- data.frame(data_source[[1]]) %>% 
-        mutate(gene_id = rownames(data.frame(data_source[[1]])))
-      
-      data <- left_join(data, gene_names()) %>% 
-        select(gene_name,log2FoldChange, padj) %>%
-        drop_na()
-      
-      names(data) <- c('Gene_symbol', 'logFC', 'Padj')
-      
-      x <- as.data.frame(filtered_counts()) %>%
-        mutate(gene_id = rownames(filtered_counts())) %>%
-        left_join(gene_names()) %>%
-        select(-gene_id) %>% 
-        tibble::column_to_rownames('gene_name')
-      
-      abundance_data(x)
-      
-    } else
-    if( name == options[2]){
-      
-      data <- data.frame(data_source[[1]]) %>% select(Gene_symbol, logFC, P.val)
-      
-      
-      
-    } else
-    if( name == options[3]){
-      
-      data <- data_source[[1]]
-      # ====== Reactive Values ======
-      pathfinder_data(data)
-      return()
-      
-    } else { return() }
-    
+
     #Set up database
     kegg <- plyr::ldply(pathfindR.data::kegg_genes, data.frame) %>% 
       mutate(num_genes_in_path = 1) %>% 
@@ -685,13 +626,12 @@ server <- function(input, output) {
     names(kegg)[2] <- "all_pathway_genes"
     
     
-
     showModal(modalDialog("Finding Paths...", footer = NULL))
     #Run pathfinder
     
     tryCatch({
       
-      res <- run_pathfindR(data,
+      res <- run_pathfindR(data_source,
                            pin_name_path = "KEGG",
                             enrichment_threshold = 0.05,
                             iterations = 25,
@@ -706,9 +646,10 @@ server <- function(input, output) {
       showModal(modalDialog("pathfindR complete with no fatal errors", easyClose = TRUE, footer = NULL))
       
       # ====== Reactive Values ======
-      pathfinder_data(res_clustered)
+      pathfinder_results(res_clustered)
       
-    }, error = function(e) {
+    }, 
+    error = function(e) {
       
       showErrorModal(paste("Error in pathfindR process:", e$message))
       
@@ -1336,21 +1277,11 @@ server <- function(input, output) {
     
     output$pathfinderPreview <- renderUI({
       
-      if( is.null(pathfinder_data()) ){
-        return(
-          div(
-            h2("Pathway analysis instructions:"),
-            p("Pathway analysis will be run using the pathfindR R package. There are three ways this can be started to yield visuals in this application:"),
-            p("1.) Use the results from your differential gene expression analysis in previous pages. If this method is used abundance data will be pulled in from a filtered version of your uploaded salmon counts matrix. This method does not require any file uploads on this page. "),
-            p("2.) If you have differential gene expression results and just want to go through pathway analysis you can upload them on this page with the required columns (Gene_symbol, P.val, logFC). Additionally, of you wish to upload abundance data you can append the samples as extra columns to this file with the prefix '.' so they can be found easily ex: (Gene_symbol, P.val, logFC, .Sample1, .Sample2). If you have a raw counts file that can be uploaded on this page as an alternative to appending the extra rows. Note that the pathway analysis will work if you uploaded differential gene expression results on page 2, but abundance data on that upload requires normalized counts so the abundance data will not be used for pathway analysis to get around this upload the data on this page instead."), 
-            p("3.) If you have a file with data from a pathfindR session that has previously been run then you can upload that on this page to revisit the data visuals and information. This file must hold clustered data from a pathfindR session, specifically the resulting dataframe from running the cluster_enriched_terms() function on results from the pathfinder package. If you wish to add abundance data with this method upload the data on this page."),
-            h3("Meta data and conditions:"),
-            p("For the best experience return to pg.1 and upload a file containing metadata for the samples in your experiment. Sample names must match the sample names in any form of abundance data you upload.")
-          )
-        )
+      if( is.null(pathfinder_results()) ){
+        return()
       }
       
-      data <- pathfinder_data() %>% select(-ID, -Up_regulated,	-Down_regulated, -all_pathway_genes)
+      data <- pathfinder_results() %>% select(-ID, -Up_regulated,	-Down_regulated, -all_pathway_genes)
       renderDT({data}, rownames = FALSE)
       
     })
@@ -1387,7 +1318,7 @@ server <- function(input, output) {
         search_clusters <- NULL
       }
       
-      plot <- enricher(pathfinder_data(), 
+      plot <- enricher(pathfinder_results(), 
                        search_clusters,
                        search_genes,
                        search_paths) 
@@ -1409,7 +1340,7 @@ server <- function(input, output) {
     
     output$enrichmentUI <- renderUI({
       
-      if(is.null(pathfinder_data())){
+      if(is.null(pathfinder_results())){
         return(span("No Data Yet",style="color: red;"))
       }
       
@@ -1419,7 +1350,7 @@ server <- function(input, output) {
     
     output$enrichment_clusters_shown <- renderUI({
 
-      if( is.null(pathfinder_data()) ){
+      if( is.null(pathfinder_results()) ){
         return()
       }
       if( input$enrichment_genes == "" && input$enrichment_paths == "" && input$enrichment_clusters == "" ){
@@ -1427,26 +1358,26 @@ server <- function(input, output) {
         sliderInput('clusters_on_enrichment', 
                     "# Clusters Shown", 
                     min = 1, 
-                    max = as.numeric(max(pathfinder_data()$Cluster)),
-                    value = round(1 + (0.15 * max(pathfinder_data()$Cluster))))
+                    max = as.numeric(max(pathfinder_results()$Cluster)),
+                    value = round(1 + (0.15 * max(pathfinder_results()$Cluster))))
       }
     })
     
     output$pathwaysDT9 <- renderUI({
-      if( is.null(pathfinder_data()) ){
+      if( is.null(pathfinder_results()) ){
         return()
       }
       
-      data <- pathfinder_data() %>% select(Term_Description)
+      data <- pathfinder_results() %>% select(Term_Description)
       renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
     })
     
     output$genes_in_paths_DT9 <- renderUI({
-      if( is.null(pathfinder_data()) ){
+      if( is.null(pathfinder_results()) ){
         return()
       }
       
-      data <- pathfinder_data() %>%
+      data <- pathfinder_results() %>%
         mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
         select(gene_list)
       
@@ -1496,7 +1427,7 @@ server <- function(input, output) {
     
     output$open_in_new_tab10 <- renderUI({
       
-      if(is.null(pathfinder_data())){
+      if(is.null(pathfinder_results())){
         return()
       }
       
@@ -1505,20 +1436,20 @@ server <- function(input, output) {
     })
     
     output$pathwaysDT10 <- renderUI({
-      if( is.null(pathfinder_data()) ){
+      if( is.null(pathfinder_results()) ){
         return()
       }
       
-      data <- pathfinder_data() %>% select(Term_Description)
+      data <- pathfinder_results() %>% select(Term_Description)
       renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
     })
     
     output$genes_in_paths_DT10 <- renderUI({
-      if( is.null(pathfinder_data()) ){
+      if( is.null(pathfinder_results()) ){
         return()
       }
       
-      data <- pathfinder_data() %>%
+      data <- pathfinder_results() %>%
         mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
         select(gene_list)
       
@@ -1544,18 +1475,20 @@ server <- function(input, output) {
     
     output$pathway_heatmap <- renderUI({
       
-      if(is.null(pathfinder_data())){
+      if(is.null(pathfinder_results())){
         return(span("No Data Yet",style="color: red;"))
       }
       
-      genes <- input$pathway_heatmap_genes
+      genes <- as.character(input$pathway_heatmap_genes)
+      print(genes)
       pathways <- input$heatmap_paths
       plot <- NULL
       
       if(nchar(genes) > 0){
         genes <- strsplit(genes, ",")[[1]]
         genes <- trimws(genes)
-        plot <- geneheatmap(pathfinder_data(), genes)
+        print(genes)
+        plot <- geneheatmap(pathfinder_results(), genes)
       }
       else if(nchar(pathways) > 0){
         
@@ -1566,11 +1499,11 @@ server <- function(input, output) {
           pathways <- trimws(pathways)
         }
         
-        plot <- pathwayheatmap(pathfinder_data(), pathways)
+        plot <- pathwayheatmap(pathfinder_results(), pathways)
         
       }
       else{
-        plot <- pathwayheatmap(pathfinder_data(), 5)
+        plot <- pathwayheatmap(pathfinder_results(), 5)
       }
      
       plot10(plot[[2]])
@@ -1598,7 +1531,7 @@ server <- function(input, output) {
     
     output$stuff <- renderPlot({
       score_terms(
-        enrichment_table = pathfinder_data(),
+        enrichment_table = pathfinder_results(),
         exp_mat = data.framse(abundance_data()),
         cases= c('.T96.s4', '.T96.s5', '.T96.s6' ),
         use_description = TRUE, # default FALSE

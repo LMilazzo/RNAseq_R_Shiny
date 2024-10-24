@@ -409,33 +409,11 @@ ui <- navbarPage("DESeq2",
 #_____________________________Side Bar__________________________________#
       sidebarPanel(width = 3,
         
-        actionButton("choosePathfindR_data", "Run Pathway Analysis"),
+        HTML('<h3>Pathway Analysis</h3><br><br><p>Continue Experiment</p>'),
+        actionButton('Run_pathfinder', 'Run'),
         
-        HTML("<br><br>"),
-        HTML("<p>Diffrentially expressed genes data (Gene_symbol, logFC, P.val)</p>"),
-        #-----------------input----------------#
-        #-----------file_for_pathfindR---------#
-        #--------------------------------------#
-        # An upload file widget for the data for pathfindR
-        fileInput('file_for_pathfindR', 
-                  ''),
-        
-        HTML("<br>"),
-        HTML("<p>Previous Pathway Analysis in PathfindR Experiment</p>"),
-        #-----------------input----------------#
-        #-----------pathfindR_data_file--------#
-        #--------------------------------------#
-        # An upload file widget for the pathfindR data
-        fileInput('pathfindR_data_file', 
-                  ''),
-        HTML("<br>"),
-        HTML("<p>Abundance data/sample counts may be used for some of the pathway analysis process. This data can be derived from an upload here or a raw counts upload pg.1 . The upload on this page is prioritized for further analysis if uploaded, otherwise a previous upload may be used.</p>"),
-        #-----------------input----------------#
-        #-----------abundance_data_file--------#
-        #--------------------------------------#
-        # An upload file widget for the abundance data
-        fileInput('abundance_data_file', 
-                  '')
+        HTML('<br><br><p>Upload a past experiment<p>'),
+        actionButton('Run_pathfinder_new_data', 'Review old experiment')
         
         
       ),

@@ -416,7 +416,7 @@ ui <- navbarPage("DESeq2",
         actionButton('Run_pathfinder_new_data', 'Review old experiment')
         
         
-      ),
+      ),##XX##~~~Side Panel End~~~##XX##
 #_____________________________Main Panel________________________________#
       mainPanel(width = 9,
         
@@ -424,11 +424,8 @@ ui <- navbarPage("DESeq2",
         uiOutput('pathfinderPreview')
                 
                 
-      )
-      
-    
-     
-     
+      )##XX##~~~Main Panel End~~~##XX##
+
    )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
   ),##XX##~~~Tab Panel Closing Bracket~~~##XX##
 #----
@@ -479,7 +476,7 @@ ui <- navbarPage("DESeq2",
                 
         uiOutput('enrichmentUI')
         
-      )
+      )##XX##~~~Main Panel End~~~##XX##
     )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
   ), ##XX##~~~Tab Panel Closing Bracket~~~##XX##
 #----
@@ -533,9 +530,22 @@ ui <- navbarPage("DESeq2",
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
 tabPanel("example",
    fluidPage(
-    
-     uiOutput('bsexample')
      
+     uiOutput('cases_select_box'),
+    
+    #_____________________________Side Bar__________________________________#
+    sidebarPanel(width = 4,
+        
+        uiOutput('sample_conditions_PreviewTable11')
+  
+     ), ##XX##~~~Side Panel End~~~##XX##
+    
+    #_____________________________Main Panel________________________________#
+    mainPanel(width = 8,
+    
+       uiOutput('bsexample')
+  
+    )##XX##~~~Main Panel End~~~##XX##
    )##XX##~~~Fluid Page Closing Bracket~~~##XX## 
   )##XX##~~~Tab Panel Closing Bracket~~~##XX##
 )#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

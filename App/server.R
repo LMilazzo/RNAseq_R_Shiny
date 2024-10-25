@@ -92,7 +92,6 @@ server <- function(input, output) {
       # Set rownames to gene_id and remove all columns that don't start with '.'
       counts <- counts %>% tibble::column_to_rownames('gene_id')
       sample_cols <- grep("^\\.", colnames(counts), value = TRUE)
-      print(sample_cols)
       non_sample_cols <- grep("^[^.]", colnames(counts), value = TRUE)
       
       # Error if there are less than 2 sample columns
@@ -515,7 +514,10 @@ server <- function(input, output) {
           fileInput('pathfinder_new_data', 'Pathway Information'),
         
           HTML('<p>Normalized count data includes (gene_name) and samples where each sample name starts with "."</p>'),
-          fileInput('pathfinder_new_abundance', 'Abundance Data')
+          fileInput('pathfinder_new_abundance', 'Abundance Data'),
+          
+          HTML('Meta Data containing samples names in column 1, conditions in following columns'),
+          fileInput('meta_data_conditions_uploaded_file', 'MetaData'),
         
         ), footer = modalButton("Finish")
         
@@ -550,26 +552,34 @@ server <- function(input, output) {
         showErrorModal('There are some missing cols in the uploaded set')
         return()
       }
+     
+      #Assert correct classes
+      original_na_counts <- sapply(colnames(new_data), 
+                                   function(col) sum(is.na(new_data[[col]]))) 
       
-      types <- c("numeric", "character", "numeric",
-                 "numeric", "numeric", "numeric",
-                 "numeric", "character", "character",
-                 "character", "character", "numeric",
-                 "numeric", "character")
-      check <- new_data %>% select(ID, Term_Description, Fold_Enrichment,
-                              occurrence, support, lowest_p,
-                              highest_p, non_Signif_Snw_Genes, Up_regulated,
-                              Down_regulated, all_pathway_genes, num_genes_in_path,
-                              Cluster, Status)
-      check <- sapply(new_data, class)
+      new_data$ID <- as.character(new_data$ID)
+      new_data$Term_Description <- as.character(new_data$Term_Description)
+      new_data$non_Signif_Snw_Genes <- as.character(new_data$non_Signif_Snw_Genes)
+      new_data$Up_regulated <- as.character(new_data$Up_regulated)
+      new_data$Down_regulated <- as.character(new_data$Down_regulated)
+      new_data$all_pathway_genes <- as.character(new_data$all_pathway_genes)
+      new_data$Status <- as.character(new_data$Status)
+      new_data$Fold_Enrichment <- as.numeric(new_data$Fold_Enrichment)
+      new_data$occurrence <- as.numeric(new_data$occurrence)
+      new_data$support <- as.numeric(new_data$support)
+      new_data$lowest_p <- as.numeric(new_data$lowest_p)
+      new_data$highest_p <- as.numeric(new_data$highest_p)
+      new_data$num_genes_in_path <- as.numeric(new_data$num_genes_in_path)
+      new_data$Cluster <- as.numeric(new_data$Cluster)
       
-      if(!sum(types == check) == 14){
-        showErrorModal('Incorrect column class types')
-        return()
+      for(i in colnames(new_data)){
+        new_na <- sum(is.na(new_data[[i]]))
+        if(!new_na == original_na_counts[[i]]){
+          showErrorModal(paste0('Coercion of column ', i, ' to proper class introduced na values. ', i, ' requires numeric.'))
+          return()
+        }
       }
       
-      #To DO
-      #Additional checks to see if correct data types
       
       # ====== Reactive Values ======
       pathfinder_results(new_data)
@@ -593,24 +603,26 @@ server <- function(input, output) {
         new_abun <- read.csv(path)
       }
       
-      if(! 'gene_name' %in% colnames(new_abun)){
-        showErrorModal('there must be a column gene_name containing unique gene names')
+      if(! 'Gene_symbol' %in% colnames(new_abun)){
+        showErrorModal('there must be a column Gene_symbol containing unique gene names')
         return()
       }
       
-      genes <- new_abun %>% select(gene_name)
+      genes <- new_abun %>% select(Gene_symbol)
       
       # ====== Reactive Values ======
       gene_names(genes)
       
       samplecol <- grep("^\\.", colnames(new_abun), value = TRUE)
-      
       if(length(samplecol) < 2){
         showErrorModal('Not enough samples found')
         return()
       }
       
-      pathfinder_abundance_data(new_abun)
+      data <- new_abun %>% select(all_of(samplecol))
+ 
+      rownames(data) <- new_abun$Gene_symbol
+      pathfinder_abundance_data(data)
       
     }
   })
@@ -640,19 +652,19 @@ server <- function(input, output) {
       res <- left_join(res, kegg)
       
       res_clustered <- cluster_enriched_terms(res,  
-                                              plot_dend = TRUE, 
-                                              plot_clusters_graph = TRUE)
+                                              plot_dend = FALSE, 
+                                              plot_clusters_graph = FALSE)
       
       showModal(modalDialog("pathfindR complete with no fatal errors", easyClose = TRUE, footer = NULL))
       
       # ====== Reactive Values ======
       pathfinder_results(res_clustered)
       
-    }, 
+    },
     error = function(e) {
-      
+
       showErrorModal(paste("Error in pathfindR process:", e$message))
-      
+
     })
     
   }
@@ -1332,8 +1344,6 @@ server <- function(input, output) {
       
       hits <- plot$data
       enrichment_plot_height_px(paste0(450 + nrow(hits) * 23, "px"))
-      print(enrichment_plot_height_px())
-      
       plot
       
     })
@@ -1480,14 +1490,12 @@ server <- function(input, output) {
       }
       
       genes <- as.character(input$pathway_heatmap_genes)
-      print(genes)
       pathways <- input$heatmap_paths
       plot <- NULL
       
       if(nchar(genes) > 0){
         genes <- strsplit(genes, ",")[[1]]
         genes <- trimws(genes)
-        print(genes)
         plot <- geneheatmap(pathfinder_results(), genes)
       }
       else if(nchar(pathways) > 0){
@@ -1528,12 +1536,46 @@ server <- function(input, output) {
     
   #______________________________Page 11___________________________#----
   
+    output$sample_conditions_PreviewTable11 <- renderUI({
+      if(!is.null(metaData())){ renderTable({metaData()}, rownames  = TRUE) }
+      else{span("Upload Meta Data",style="color: red;")}
+    })
+    
+    output$cases_select_box <- renderUI({
+      
+      caseoptions <- rownames(metaData())
+      
+      
+      checkboxGroupInput('score_terms_cases', 'Select Case Samples', 
+                         choices = caseoptions, inline = TRUE)
+      
+      
+    })
     
     output$stuff <- renderPlot({
+
+      if(is.null(pathfinder_results())){
+        return()
+      }
+
+      if(is.null(metaData())){
+        return()
+      }
+
+      if(is.null(pathfinder_abundance_data())){
+        return()
+      }
+      
+      if(is.null(input$score_terms_cases)){
+        caseSamples <- NULL
+      }else(
+        caseSamples <- input$score_terms_cases
+      )
+      
       score_terms(
         enrichment_table = pathfinder_results(),
-        exp_mat = data.framse(abundance_data()),
-        cases= c('.T96.s4', '.T96.s5', '.T96.s6' ),
+        exp_mat = as.matrix(pathfinder_abundance_data()),
+        cases = caseSamples,
         use_description = TRUE, # default FALSE
         label_samples = TRUE, # default = TRUE
         #case_title = "RA", # default = "Case"
@@ -1543,7 +1585,7 @@ server <- function(input, output) {
         high = "#1f4037" # default = "red"
       )
     })
-    
+
     output$bsexample <- renderUI({
       plotOutput('stuff')
     })

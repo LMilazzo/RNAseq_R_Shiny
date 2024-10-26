@@ -1536,6 +1536,9 @@ server <- function(input, output) {
     
   #______________________________Page 11___________________________#----
   
+    page11_height <- reactiveVal(500)
+    page11_width <- reactiveVal(500)
+    
     output$sample_conditions_PreviewTable11 <- renderUI({
       if(!is.null(metaData())){ renderTable({metaData()}, rownames  = TRUE) }
       else{span("Upload Meta Data",style="color: red;")}
@@ -1545,10 +1548,8 @@ server <- function(input, output) {
       
       caseoptions <- rownames(metaData())
       
-      
       checkboxGroupInput('score_terms_cases', 'Select Case Samples', 
                          choices = caseoptions, inline = TRUE)
-      
       
     })
     
@@ -1572,22 +1573,27 @@ server <- function(input, output) {
         caseSamples <- input$score_terms_cases
       )
       
-      score_terms(
-        enrichment_table = pathfinder_results(),
-        exp_mat = as.matrix(pathfinder_abundance_data()),
-        cases = caseSamples,
-        use_description = TRUE, # default FALSE
-        label_samples = TRUE, # default = TRUE
-        #case_title = "RA", # default = "Case"
-        #control_title = "Healthy", # default = "Control"
-        low = "#f7797d", # default = "green"
-        mid = "#fffde4", # default = "black"
-        high = "#1f4037" # default = "red"
-      )
+      ab <- pathfinder_abundance_data() %>% 
+        mutate(Gene_symbol = rownames(pathfinder_abundance_data()))
+      
+      plotdata <- score_pathway_terms(
+                                   data = pathfinder_results(),
+                                   abundance = ab,
+                                   cases = caseSamples,
+                                   repOnly = TRUE, 
+                                   pathways = NULL)
+      
+      page11_height(plotdata[[2]])
+      page11_width(plotdata[[3]])
+
+      plot <- plotdata[[1]]
+      
+      plot
+      
     })
 
     output$bsexample <- renderUI({
-      plotOutput('stuff')
+      plotOutput('stuff', height = page11_height(), width = page11_width())
     })
     
 #----

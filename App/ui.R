@@ -43,27 +43,29 @@ ui <- navbarPage("DESeq2",
           
           sidebarPanel(
             
-            HTML("<p>(Optional If you still need to run the DEG process for your data)</p>"),
-            HTML("<p>If you already have this done and a file with data skip this page</p>"),
-            HTML("<h2>Upload Data</h1>"),
+            HTML("<p>Sample counts matrix:</p>"),
+            HTML("<p>Supported file types:  .csv   .tsv"),
+            HTML("<p>Format: ( gene_id, gene_name, .samples... ) </p>"),
+            HTML("<p>gene_id must be unique for all genes</p>"),
             
             #-----------------input----------------#
             #---merged_gene_counts_uploaded_file---#
             #--------------------------------------#
             # An upload file widget for the merged gene counts tsv,csv
             fileInput("merged_gene_counts_uploaded_file", 
-                      "Salmon Merged Counts .tsv/.csv file"),
+                      "Counts Matrix"),
 
-            HTML("<p>(Not Optional)</p>"),
-            HTML("<p>Meta Data and conditions is needed for analysis</p>"),
-            HTML("<h2>Upload Meta Data</h1>"),
+            HTML("<p>Sample conditions / meta data : </p>"),
+            HTML("<p>Supported file types:  .csv   .tsv"),
+            HTML("<p>Format: ( sample, condions... ) </p>"),
+            HTML("<p>The sample column should match the list of samples found in the counts matrix</p>"),
             
             #-----------------input----------------#
             #--meta_data_conditions_uploaded_file--#
             #--------------------------------------#
             # An upload file widget for the metadata .csv file 
             fileInput("meta_data_conditions_uploaded_file", 
-                      "Conditions"),
+                      "Sample Conditions"),
             
             #-----------------input----------------#
             #---------------run_DESeq2-------------#
@@ -78,16 +80,16 @@ ui <- navbarPage("DESeq2",
           
           mainPanel(
             
-            HTML("<h1>Raw Counts Table</h1>"),
-            HTML("<p1>Upload your salmon merged counts matrix on the left. Your 
-                 uploaded file must be a .tsv file. Below you can explore and search
-                 through your unfiltered data once uploaded."),
+            HTML("<h5>Counts Matrix</h5>"),
+            # HTML("<p1>Upload your salmon merged counts matrix on the left. Your 
+            #      uploaded file must be a .tsv file. Below you can explore and search
+            #      through your unfiltered data once uploaded."),
             
             uiOutput('raw_counts_PreviewTable'),
             
-            HTML("<h1>Conditions (meta data) Table</h1>"),
-            HTML("<p1>Upload a .csv file with the samples in column 1 and their 
-                 conditions in column 2."),
+            HTML("<h5>Sample Conditions</h5>"),
+            # HTML("<p1>Upload a .csv file with the samples in column 1 and their 
+            #      conditions in column 2."),
             
             uiOutput('sample_conditions_PreviewTable')
             

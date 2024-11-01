@@ -497,6 +497,7 @@ server <- function(input, output) {
       pathfinder_abundance_data(normalized_counts() %>% 
                                   tibble::rownames_to_column(var = 'Gene_symbol'))
       
+      
       runPathfindRFunc(data)
       
     }
@@ -622,7 +623,8 @@ server <- function(input, output) {
       data <- new_abun %>% select(all_of(samplecol))
  
       rownames(data) <- new_abun$Gene_symbol
-      pathfinder_abundance_data(data)
+      pathfinder_abundance_data(data %>% tibble::rownames_to_column('Gene_symbol'))
+      print(head(pathfinder_abundance_data()))
       
     }
   })
@@ -681,7 +683,7 @@ server <- function(input, output) {
         
         df <- raw_counts()
         
-        table <- renderUI({span("No Raw counts to display",style="color: red;")})
+        table <- renderUI({span("Upload a file",style="color: red;")})
 
         if(!is.null(df)){
           
@@ -693,7 +695,7 @@ server <- function(input, output) {
           #Organize columns
           df <- data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
           
-          table <- renderDT({df}, rownames = TRUE, options = list(pageLength=5))
+          table <- renderDT({df}, rownames = FALSE, options = list(pageLength=5))
         }
 
         div(table)
@@ -703,7 +705,7 @@ server <- function(input, output) {
     # render table for metadata
     output$sample_conditions_PreviewTable <- renderUI({
         if(!is.null(metaData())){ renderTable({metaData()}, rownames  = TRUE) }
-        else{span("Upload Meta Data",style="color: red;")}
+        else{span("Upload a file",style="color: red;")}
     })
     
 
@@ -1573,9 +1575,13 @@ server <- function(input, output) {
         caseSamples <- input$score_terms_cases
       )
       
-      ab <- pathfinder_abundance_data() %>% 
-        mutate(Gene_symbol = rownames(pathfinder_abundance_data()))
+      ab <- pathfinder_abundance_data()
       
+      print(ab)
+      print('______________________________________________________')
+      print(ncol(ab))
+      print('______________________________________________________')
+      print(pathfinder_results())
       plotdata <- score_pathway_terms(
                                    data = pathfinder_results(),
                                    abundance = ab,

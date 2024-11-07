@@ -24,6 +24,7 @@ library(tidyr)
 library(shinyjs)
 library(plotly)
 library(htmlwidgets)
+library(grid)
 #----
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
@@ -198,7 +199,7 @@ tabPanel("Principle Component Plots",
              
     ),
        
-    mainPanel(width=10,     
+    mainPanel(width=9,     
           
       uiOutput('principle_component_plots_ui')
           
@@ -420,7 +421,7 @@ tabPanel("Term Gene Heatmap",
   )
 ),
 # Case Map________________________________________________________________#----
-tabPanel("example",
+tabPanel("Case vs. Control",
   fluidPage(
     
     uiOutput('cases_select_box'),
@@ -435,6 +436,30 @@ tabPanel("example",
          
       uiOutput('case_plot_ui')
     
+    )
+  )
+),
+# Single Pathway heatmap__________________________________________________#----
+tabPanel("Single Pathway vs. Samples",
+  fluidPage(
+   
+    sidebarPanel(width = 4,
+
+      textInput('Single_pathway_plot_search', 
+                'Pathway to visualize', 
+                value = ""),
+      
+      numericInput('Single_pathway_plot_num_points', 
+                   'Number of genes to visualize (priority to lowest pvals',
+                   value = 40,
+                   min = 10)
+      
+    ),
+    
+    mainPanel(width = 8,
+              
+      uiOutput('Single_pathway_plot_ui')
+      
     )
   )
 )

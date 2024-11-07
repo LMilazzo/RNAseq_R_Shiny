@@ -46,6 +46,12 @@ server <- function(input, output) {
   # Pathfinder old experiment uploads
   pathfinder_abundance_data <- reactiveVal(NULL)
   
+  #Abunance data gene names
+  gene_names_abundance <- reactiveVal(NULL)
+  
+  #Pathfinder meta data
+  pathfinder_metaData <- reactiveVal(NULL)
+  
 #---- 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######_______________Observables________________######~~~~~#
@@ -549,6 +555,7 @@ server <- function(input, output) {
         return()
       }
       
+      pathfinder_metaData(metaData())
       pathfinder_results(res)
       
       show("TabSet2_Pathway_Analysis")
@@ -600,6 +607,32 @@ server <- function(input, output) {
   
   #Run with new data
   observeEvent(input$review_pathfinder_new_data,{
+    
+    if(is.null(metaData())){
+      metadata_input <- div(
+          h5("Sample Conditions Table"),
+          p("Accepted File Types:  .csv   .tsv "),
+          p("Format: (sample, conditions...) "),
+          p("Sample column should include sample names that are found in your experiment data"),
+          fileInput("meta_data_Old_Pathway_Experiment", "Sample Conditions")
+      )
+    }else{
+      
+      output$tempTableXX <- renderTable({metaData()}, rownames  = TRUE)
+      
+      metadata_input <- div(
+          h5("Sample Conditions Table"),
+          p('***Optional A valid file has previously been uploaded***'),
+          p('Previous upload'),
+          tableOutput('tempTableXX'),
+          p("File uploaded now will override the previous"),
+          p("Accepted File Types:  .csv   .tsv "),
+          p("Format: (sample, conditions...) "),
+          p("Sample column should include sample names that are found in your experiment data"),
+          fileInput("meta_data_Old_Pathway_Experiment", "Sample Conditions")
+        )
+    }
+    
     #uploads
     showModal(
       modalDialog(
@@ -613,13 +646,7 @@ server <- function(input, output) {
           HTML('<p>Normalized count data includes (gene_name) and samples where each sample name starts with "."</p>'),
           fileInput('pathfinder_new_abundance', 'Abundance Data'),
           
-          div(
-            h5("Sample Conditions Table"),
-            p("Accepted File Types:  .csv   .tsv "),
-            p("Format: (sample, conditions...) "),
-            p("Sample column should include sample names that are found in your experiment data"),
-            fileInput("meta_data_Old_Pathway_Experiment", "Sample Conditions")
-          )
+          metadata_input
           
         ), footer = actionButton("finish_uploading_old_pathfinder", 'Finish'),
         easyClose = TRUE
@@ -631,13 +658,11 @@ server <- function(input, output) {
   observeEvent(input$finish_uploading_old_pathfinder,{
     
     #Check for properly uploaded files
-    if(is.null(input$pathfinder_new_data)
-       || is.null(input$meta_data_Old_Pathway_Experiment)){
+    if(is.null(input$pathfinder_new_data)){
       
       showErrorModal('A file was not uploaded properly try again')
       return()
     }
-    #is.null(input$pathfinder_new_abundance)
     
     removeModal()
     
@@ -650,7 +675,56 @@ server <- function(input, output) {
           actionButton('cancel_without_abundance', 'Cancel'))
         )
       )
+    }else{
+      
+      removeModal()
+      
+      if(!is.null(input$meta_data_Old_Pathway_Experiment)){
+        meta_data <- readMetaData(input$meta_data_Old_Pathway_Experiment$datapath)
+        if(is.null(meta_data)){
+          return()
+        }
+      }else if(!is.null(metaData())){
+        meta_data <- metaData()
+      }else{
+        return()
+      }
+      
+      
+      data <- readPathfinderNewData(input$pathfinder_new_data$datapath)
+      
+      if(is.null(data)){
+        return()
+      }
+      
+      if(!is.null(input$pathfinder_new_abundance)){
+        
+        abundance <- readPathfinderNewAbundance(input$pathfinder_new_abundance$datapath)
+        
+        if(is.null(abundance)){
+          return()
+        }
+        
+        gene_names_abundance(abundance[[1]])
+        
+        if(!is.null(gene_names())){
+          diff <- nrow(gene_names()) - nrow(gene_names_abundance())
+          if(!diff == 0){
+            showErrorModal(paste0('There was a difference of ', abs(diff), ' in the number of genes in your DEG and Pathfinder uploads'))
+          }
+        }
+        
+        pathfinder_abundance_data(abundance[[2]])
+        
+      }
+      
+      pathfinder_results(data)
+      pathfinder_metaData(meta_data)
+      
+      hide('about_pathfinder')
+      show("TabSet2_Pathway_Analysis")
     }
+    
   })
   observeEvent(input$cancel_without_abundance, {
     removeModal()
@@ -660,9 +734,14 @@ server <- function(input, output) {
     
     removeModal()
     
-    meta_data <- readMetaData(input$meta_data_Old_Pathway_Experiment$datapath)
-    
-    if(is.null(meta_data)){
+    if(!is.null(input$meta_data_Old_Pathway_Experiment)){
+      meta_data <- readMetaData(input$meta_data_Old_Pathway_Experiment$datapath)
+      if(is.null(meta_data)){
+        return()
+      }
+    }else if(!is.null(metaData())){
+      meta_data <- metaData()
+    }else{
       return()
     }
     
@@ -685,8 +764,9 @@ server <- function(input, output) {
     }
     
     pathfinder_results(data)
-    metaData(meta_data)
-    
+    pathfinder_metaData(meta_data)
+   
+    hide('about_pathfinder')
     show("TabSet2_Pathway_Analysis")
   })
   
@@ -1392,17 +1472,15 @@ server <- function(input, output) {
       plotOutput('volcano_plot', height= "900px", width = "100%")
       
     })
-     
-   
-  
-  
+
+  #----
+    
   #Page2 pretab----
     output$about_pathfinder <- renderUI({
       p('About Pathfinder')
     })
   #----  
   
-    
   #Tabset 2
   #______________________________Path 1____________________________#----
     
@@ -1659,13 +1737,13 @@ server <- function(input, output) {
     page11_width <- reactiveVal(500)
     
     output$sample_conditions_PreviewTable11 <- renderUI({
-      if(!is.null(metaData())){ renderTable({metaData()}, rownames  = TRUE) }
+      if(!is.null(pathfinder_metaData())){ renderTable({pathfinder_metaData()}, rownames  = TRUE) }
       else{span("Upload Meta Data",style="color: red;")}
     })
     
     output$cases_select_box <- renderUI({
       
-      caseoptions <- rownames(metaData())
+      caseoptions <- rownames(pathfinder_metaData())
       
       checkboxGroupInput('score_terms_cases', 'Select Case Samples', 
                          choices = caseoptions, inline = TRUE)
@@ -1678,7 +1756,7 @@ server <- function(input, output) {
         return()
       }
 
-      if(is.null(metaData())){
+      if(is.null(pathfinder_metaData())){
         return()
       }
 
@@ -1717,6 +1795,101 @@ server <- function(input, output) {
         plotOutput('case_map_plot', height = page11_height(), width = page11_width())
       }
     })
+    
+    
+  #______________________________Path 5____________________________#----
+  
+    sin_path_plot_h <- reactiveVal(600)
+    sin_path_plot_w <- reactiveVal(600)
+    
+    output$Single_pathway_plot <- renderPlot({
+      
+      if(is.null(pathfinder_results())){
+        return()
+      }
+      
+      if(!is.null(pathfinder_abundance_data())){
+        
+        b <- pathfinder_abundance_data()
+        
+        b_name <- b %>% mutate(gene_name = Gene_symbol) %>%
+          select(-Gene_symbol)
+        
+        ab <- b_name
+        
+      }else if(!is.null(normalized_counts())){
+        
+        b <- normalized_counts()
+        
+        b$gene_id <- rownames(b)
+        
+        b_name <- b %>% left_join(gene_names()) %>% select(-gene_id)
+        
+        ab <- b_name
+                
+      }else{
+        
+        return()
+      
+      }
+      
+      ab$gene_name <- tolower(ab$gene_name)
+      
+      if(!is.null(results_ddsc())){
+        #set up deg
+        d <- results_ddsc()
+        d$gene_id <- rownames(d)
+        d_named <- d %>% left_join(gene_names()) %>% select(-gene_id)
+        d_named$gene_name <- tolower(d_named$gene_name)
+        
+        #merge deg and abundance
+        
+        DEG_ARGS <- d_named %>% left_join(ab)
+      }else{
+        ab$padj <- 0
+        
+        DEG_ARGS <- ab
+        
+      }
+      
+      data <- single_pathway_heatmap(input$Single_pathway_plot_search, 
+                                     DEG_ARGS, 
+                                     pathfinder_results(), 
+                                     genes_listed = input$Single_pathway_plot_num_points)
+      if(!is.matrix(data)){
+        return()
+      }  
+      
+      w <- ncol(data) * 100
+      if(w < 900){
+        w <- 900
+      }
+      sin_path_plot_w(w)
+      
+      h <- nrow(data) * 20
+      if(h < 700){
+        h <- 700
+      }
+      sin_path_plot_h(h)
+      
+      pheatmap(data, scale = 'row', fontsize = 15, angle_col = "45", 
+               legend_breaks = c(-2, -1, 0, 1, 2), main = input$Single_pathway_plot_search)
+      
+    })
+    
+    output$Single_pathway_plot_ui <- renderUI({
+      
+      h <- paste0("", sin_path_plot_h(), "px")
+      w <- paste0("", sin_path_plot_w(), "px")
+      
+      print(h)
+      print(w)
+      
+      plotOutput('Single_pathway_plot', height = h, width = w)
+      
+    })
+    
+    
     
 #----
 } #X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

@@ -584,6 +584,7 @@ server <- function(input, output) {
       
       show("TabSet2_Pathway_Analysis")
       hide('pathfinder_option_buttons')
+      hide('about_PathfindR')
     
     }
       
@@ -629,6 +630,7 @@ server <- function(input, output) {
     
     show("TabSet2_Pathway_Analysis")
     hide('pathfinder_option_buttons')
+    hide('about_PathfindR')
     
   })
   # Function to actually run
@@ -793,6 +795,7 @@ server <- function(input, output) {
       
       hide('about_pathfinder')
       show("TabSet2_Pathway_Analysis")
+      hide('about_PathfindR')
     }
     
   })

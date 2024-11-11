@@ -24,7 +24,8 @@ library(tidyr)
 library(shinyjs)
 library(plotly)
 library(htmlwidgets)
-library(grid)
+library(png)
+library(leaflet)
 #----
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
@@ -45,6 +46,12 @@ ui <- tagList(tags$style(HTML("
     table.dataTable tbody {
       background-color: #333333; /* Change body background */
     }
+    
+    body {
+    -moz-transform: scale(0.8, 0.8); /* Moz-browsers */
+    zoom: 0.8; /* Other non-webkit browsers */
+    zoom: 80%; /* Webkit browsers */
+    }
   ")),
   useShinyjs(),
   
@@ -54,7 +61,14 @@ ui <- tagList(tags$style(HTML("
   
 # Page 1__________________________________________________________________#----
 
-  tabPanel("Help"),
+  tabPanel("Help",
+           
+    fluidPage(
+      plotlyOutput('interactive_image')
+    )
+           
+  ),
+    
 
 # Page 2__________________________________________________________________#----
 
@@ -323,7 +337,7 @@ tabPanel("Volcano Plot",
            )
         ),
         div(id="pathfinder_option_buttons",
-          column(9, offset = 1,
+          column(7, offset = 1,
             fluidRow(
               column(4,
                 actionButton('Run_pathfinder', 'Continue Experiment With Pathway Analysis',

@@ -418,7 +418,6 @@ server <- function(input, output) {
       return()
     }
       
-    
     #Check for req columns
     req_col <- c( "gene_id" , "gene_name" , "log2FoldChange" , "padj" )
     possible_col <- c("gene_id", "gene_name", "baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj")
@@ -450,28 +449,33 @@ server <- function(input, output) {
     sample_columns <- data[, grep("^\\.", colnames(data), value = TRUE)] # all columns starting with '.'
       
     if (ncol(sample_columns) == 0) {
+      
       showErrorModal("Warning: Some features not available because of missing sample data")
+      
+      return(list(results, gene_names, NULL, NULL, NULL))
+      
+    }else{
+      
+      if (!nrow(sample_columns) == nrow(gene_names)) {
+        showErrorModal("Error: number of rows in the sample data != rows in gene names list")
+        return()
+      }
+      
+      # Set row names for sample columns
+      rownames(sample_columns) <- gene_names$gene_id
+      
+      if( nrow(meta_data) != ncol(sample_columns) ){
+        showErrorModal("Error: Number of samples in meta data is not the same as the number of samples in the counts data")
+        return()
+      }
+      
+      counts <- round(sample_columns)    
+      
+      v <- varianceStabilizingTransformation(as.matrix(counts), blind=TRUE)
+      se <- SummarizedExperiment(assays = list(counts = v), colData = meta_data)
+      vsd <- DESeqTransform(se)
     }
       
-    if (!nrow(sample_columns) == nrow(gene_names)) {
-      showErrorModal("Error: number of rows in the counts data != rows in gene names list")
-      return()
-    }
-      
-    # Set row names for sample columns
-    rownames(sample_columns) <- gene_names$gene_id
-    
-    if( nrow(meta_data) != ncol(sample_columns) ){
-      showErrorModal("Error: Number of samples in meta data is not the same as the number of samples in the counts data")
-      return()
-    }
-      
-    counts <- round(sample_columns)    
-      
-    v <- varianceStabilizingTransformation(as.matrix(counts), blind=TRUE)
-    se <- SummarizedExperiment(assays = list(counts = v), colData = meta_data)
-    vsd <- DESeqTransform(se)
-    
     return(list(results, gene_names, sample_columns, data.frame(v), vsd))
   }
   
@@ -535,20 +539,40 @@ server <- function(input, output) {
     
     if( is.null( results_ddsc() )){
       showErrorModal('No diffrentially expressed gene experiment has been completed')
+      
+      return()
+    }
+    
+    if(is.null(normalized_counts())){
+      showModal(
+        modalDialog(
+          
+          div(
+            p("There is no count data for samples in your expirement yet!"),
+            p("If you proceed without them you may miss out on some features"),
+            p("(Optional)"),
+            HTML('<p>Normalized count data includes (gene_name) and samples where each sample name starts with "."</p>'),
+            fileInput('running_pathfinder_but_forgot_abundance', 'Abundance Data'),
+          ), footer = actionButton("continuePF_after_forgotten_data", "Continue"),
+          easyClose = FALSE
+          
+        )
+      )
     }else{
+      gene_names_abundance(normalized_counts() %>% 
+                             mutate(Gene_symbol = rownames(normalized_counts())) %>%
+                             select(Gene_symbol))
+      
+      pathfinder_abundance_data(normalized_counts() %>% 
+                                  mutate(Gene_symbol = rownames(normalized_counts())))
+    
       
       data <- results_ddsc() %>% 
-        tibble::rownames_to_column(var = 'gene_id') %>%
+        mutate(gene_id = rownames(results_ddsc())) %>%
         left_join(gene_names())  %>%
         select(Gene_symbol = gene_name, logFC = log2FoldChange, Padj = padj) %>%
         filter(!is.na(Padj))
-
-        
-      # ====== Reactive Values ======
-      pathfinder_abundance_data(normalized_counts() %>% 
-                                  tibble::rownames_to_column(var = 'Gene_symbol'))
-      
-      
+  
       res <- runPathfindRFunc(data)
       
       if(is.null(res)){
@@ -560,8 +584,52 @@ server <- function(input, output) {
       
       show("TabSet2_Pathway_Analysis")
       hide('pathfinder_option_buttons')
-      
+    
     }
+      
+  })
+  # Extra check for abundance data upload
+  observeEvent(input$continuePF_after_forgotten_data,{
+    
+    if(!is.null(input$running_pathfinder_but_forgot_abundance)){
+      
+      abundance <- readPathfinderNewAbundance(input$running_pathfinder_but_forgot_abundance$datapath)
+    
+      if(is.null(abundance)){
+        return()
+      }
+      
+      gene_names_abundance(abundance[[1]])
+      print('here')
+      
+      normalized_counts(abundance[[2]])
+      
+      print('there')
+      
+      pathfinder_abundance_data(abundance[[2]] %>% 
+                                  tibble::rownames_to_column('Gene_symbol'))
+      print('done')
+    }
+    
+    
+    data <- results_ddsc() %>% 
+      mutate(gene_id = rownames(results_ddsc())) %>%
+      left_join(gene_names())  %>%
+      select(Gene_symbol = gene_name, logFC = log2FoldChange, Padj = padj) %>%
+      filter(!is.na(Padj))
+    
+    res <- runPathfindRFunc(data)
+    
+    if(is.null(res)){
+      return()
+    }
+    
+    pathfinder_metaData(metaData())
+    pathfinder_results(res)
+    
+    show("TabSet2_Pathway_Analysis")
+    hide('pathfinder_option_buttons')
+    
   })
   # Function to actually run
   runPathfindRFunc <- function(data_source){
@@ -658,8 +726,9 @@ server <- function(input, output) {
   observeEvent(input$finish_uploading_old_pathfinder,{
     
     #Check for properly uploaded files
-    if(is.null(input$pathfinder_new_data)){
-      
+    if(is.null(input$pathfinder_new_data) || 
+       (is.null(input$meta_data_Old_Pathway_Experiment) && is.null(metaData())) 
+    ){
       showErrorModal('A file was not uploaded properly try again')
       return()
     }
@@ -714,7 +783,8 @@ server <- function(input, output) {
           }
         }
         
-        pathfinder_abundance_data(abundance[[2]])
+        pathfinder_abundance_data(abundance[[2]] %>% 
+                                    tibble::rownames_to_column('Gene_symbol'))
         
       }
       
@@ -845,12 +915,15 @@ server <- function(input, output) {
       new_abun <- read.csv(path)
     }
     
-    if(! 'Gene_symbol' %in% colnames(new_abun)){
-      showErrorModal('there must be a column Gene_symbol containing unique gene names')
+    
+    if('Gene_symbol' %in% colnames(new_abun)){
+      genes <- new_abun %>% select(Gene_symbol)
+    }else if('gene_name' %in% colnames(new_abun)){
+      genes <- new_abun %>% select(gene_name)
+    }else{
+      showErrorModal('there must be a column Gene_symbol or gene_name containing unique gene names')
       return()
     }
-    
-    genes <- new_abun %>% select(Gene_symbol)
     
     samplecol <- grep("^\\.", colnames(new_abun), value = TRUE)
     if(length(samplecol) < 2){
@@ -858,11 +931,11 @@ server <- function(input, output) {
       return()
     }
     
-    data <- new_abun %>% select(all_of(samplecol))
-
-    rownames(data) <- new_abun$Gene_symbol
     
-    data <- data %>% tibble::rownames_to_column('Gene_symbol')
+    data <- new_abun %>% 
+      select(all_of(samplecol), any_of(c("Gene_symbol", "gene_name"))) %>%
+      tibble::column_to_rownames(var = names(.)[ncol(.)]) %>%
+      select(all_of(samplecol))
     
     return(list(genes, data))
       
@@ -873,9 +946,88 @@ server <- function(input, output) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #----
   
+  #Help Tab
+  #_______________________Interactive Flow Map_____________________#----
+  
+    output$interactive_image <- renderPlotly({
+      
+      img_width = 1600 
+      img_height = 900 
+      scale_factor = 1 
+      
+      
+      # Add invisible scatter trace. 
+      # This trace is added to help the autoresize logic work. 
+      fig <- plot_ly(width=img_width * scale_factor, 
+                     height=img_height * scale_factor 
+      ) %>% 
+        add_trace( x= c(0, img_width * scale_factor), 
+                   y= c(0, img_height * scale_factor), 
+                   type = 'scatter',  mode = 'markers', alpha = 0) 
+      
+      # Configure axes 
+      xconfig <- list( 
+        title = "", 
+        zeroline = FALSE, 
+        showline = FALSE, 
+        showticklabels = FALSE, 
+        showgrid = FALSE, 
+        range = c(0, img_width * scale_factor) 
+      ) 
+      
+      yconfig <- list( 
+        title = "", 
+        zeroline = FALSE, 
+        showline = FALSE, 
+        showticklabels = FALSE, 
+        showgrid = FALSE, 
+        range = c(0, img_height * scale_factor), 
+        scaleanchor="x" 
+      ) 
+      
+      fig <- fig %>% layout(xaxis = xconfig, yaxis = yconfig) 
+      
+      # Add image 
+      
+      fig <- fig %>% layout( 
+        images = list(  
+          list(  
+            source =  "Workflow_Cropped.PNG",  
+            x=0, 
+            sizex=img_width * scale_factor, 
+            y=img_height * scale_factor, 
+            sizey=img_height * scale_factor, 
+            xref="x", 
+            yref="y", 
+            opacity=1.0, 
+            layer="below", 
+            sizing="stretch" 
+          )  
+        )) 
+      
+      # Configure other layout 
+      
+      m = list(r=0, l=0, b=0, t=0) 
+      fig <- fig %>% layout(margin = m) %>%
+        layout(plot_bgcolor='#e5ecf6',  
+               xaxis = list(  
+                 zerolinecolor = '#ffff',  
+                 zerolinewidth = 2,  
+                 gridcolor = 'ffff'),  
+               yaxis = list(  
+                 zerolinecolor = '#ffff',  
+                 zerolinewidth = 2,  
+                 gridcolor = 'ffff')  
+        )
+      fig
+    })
+  
+  
+  
+  
   #Page1 pretab----
     output$about_DESeq2 <- renderUI({
-      p('About DESeq')
+      includeHTML('www/DESeq2_Intro.HTML')
     })
     output$preRun_preview1 <- renderUI({
     df <- raw_counts()
@@ -1477,7 +1629,7 @@ server <- function(input, output) {
     
   #Page2 pretab----
     output$about_pathfinder <- renderUI({
-      p('About Pathfinder')
+      includeHTML('www/PathfindR_Intro.HTML')
     })
   #----  
   
@@ -1506,8 +1658,7 @@ server <- function(input, output) {
       }else{
         search_genes <- NULL
       }
-      
-      
+
       if( input$enrichment_paths != c("") ){
         search_paths <- strsplit(input$enrichment_paths, ",")[[1]]
         search_paths <- trimws(search_paths)
@@ -1759,10 +1910,6 @@ server <- function(input, output) {
       if(is.null(pathfinder_metaData())){
         return()
       }
-
-      if(is.null(pathfinder_abundance_data())){
-        return()
-      }
       
       if(is.null(input$score_terms_cases)){
         caseSamples <- NULL
@@ -1770,7 +1917,17 @@ server <- function(input, output) {
         caseSamples <- input$score_terms_cases
       )
       
-      ab <- pathfinder_abundance_data()
+      if(!is.null(pathfinder_abundance_data())){
+        ab <- pathfinder_abundance_data()
+      }else if(!is.null(normalized_counts())){
+        ab <- normalized_counts()
+        ab$gene_id <- rownames(ab)
+        ab <- ab %>% left_join(gene_names())
+        ab <- ab %>% mutate(Gene_symbol = gene_name) %>%
+          select(-gene_id, -gene_name)
+      }else{
+        return()
+      }
       
       plotdata <- score_pathway_terms(
                                    data = pathfinder_results(),
@@ -1789,8 +1946,8 @@ server <- function(input, output) {
     })
 
     output$case_plot_ui <- renderUI({
-      if(is.null(pathfinder_abundance_data())){
-        span("Abundance Data is Needed for this Visual",style="color: red;")
+      if(is.null(pathfinder_abundance_data()) && is.null(normalized_counts())){
+        span("Abundance or counts Data is Needed for this Visual",style="color: red;")
       }else{
         plotOutput('case_map_plot', height = page11_height(), width = page11_width())
       }
@@ -1798,7 +1955,7 @@ server <- function(input, output) {
     
     
   #______________________________Path 5____________________________#----
-  
+
     sin_path_plot_h <- reactiveVal(600)
     sin_path_plot_w <- reactiveVal(600)
     
@@ -1858,7 +2015,7 @@ server <- function(input, output) {
                                      genes_listed = input$Single_pathway_plot_num_points)
       if(!is.matrix(data)){
         return()
-      }  
+      }
       
       w <- ncol(data) * 100
       if(w < 900){
@@ -1871,21 +2028,24 @@ server <- function(input, output) {
         h <- 700
       }
       sin_path_plot_h(h)
-      
+    
       pheatmap(data, scale = 'row', fontsize = 15, angle_col = "45", 
                legend_breaks = c(-2, -1, 0, 1, 2), main = input$Single_pathway_plot_search)
+      
       
     })
     
     output$Single_pathway_plot_ui <- renderUI({
+    
+      if(!tolower(input$Single_pathway_plot_search) %in% tolower(pathfinder_results()$Term_Description)){
+        
+      }else{
       
-      h <- paste0("", sin_path_plot_h(), "px")
-      w <- paste0("", sin_path_plot_w(), "px")
-      
-      print(h)
-      print(w)
-      
-      plotOutput('Single_pathway_plot', height = h, width = w)
+        h <- paste0("", sin_path_plot_h(), "px")
+        w <- paste0("", sin_path_plot_w(), "px")
+        
+        plotOutput('Single_pathway_plot', height = h, width = w)
+      }
       
     })
     

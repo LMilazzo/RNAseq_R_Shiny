@@ -1,0 +1,85 @@
+<!-- Save this as pathfindr_intro.html -->
+
+<div class="pathfindr-content">
+  <header>
+    <h1>pathfindR: Pathway Enrichment Analysis in R</h1>
+    <p class="intro">The <strong>pathfindR</strong> package enhances differential gene expression (DGE) analysis by identifying biological pathways significantly enriched among differentially expressed genes (DEGs). It pairs seamlessly with <strong>DESeq2</strong> for comprehensive insights.</p>
+  </header>
+
+  <section>
+    <h2>What is Pathway Enrichment Analysis?</h2>
+    <p>Pathway enrichment analysis evaluates groups of related genes to identify pathways significantly impacted by experimental conditions. This approach provides higher-level insights into affected biological processes, translating gene-level changes into meaningful biological interpretations.</p>
+  </section>
+
+  <section>
+    <h2>How pathfindR Works with DESeq2</h2>
+    <p>Using DESeq2 for differential expression analysis produces a list of DEGs based on significant fold changes. pathfindR then takes these DEGs and performs pathway enrichment analysis to identify which pathways are likely affected by the observed gene expression changes:</p>
+    <ul>
+      <li><strong>DESeq2</strong>: Detects significant changes in gene expression, generating a DEG list with fold change and p-values.</li>
+      <li><strong>pathfindR</strong>: Performs enrichment analysis on DEGs to identify significant pathways, using databases like KEGG or Reactome.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Features of pathfindR</h2>
+    <p>pathfindR provides several features that make pathway enrichment analysis accessible and informative:</p>
+    <ul>
+      <li><strong>Comprehensive Pathway Databases</strong>: Supports multiple pathway databases for versatile analysis.</li>
+      <li><strong>Visual Representation</strong>: Offers bubble plots and other visual outputs to facilitate result interpretation.</li>
+      <li><strong>Data Filtering</strong>: Built-in filtering improves analysis accuracy by removing low-confidence findings.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Example Workflow</h2>
+    <ol>
+      <li><strong>Identify DEGs with DESeq2</strong>: Run differential expression analysis to identify significant genes.</li>
+      <li><strong>Prepare Data for pathfindR</strong>: Export DESeq2 results to use as input for pathfindR.</li>
+      <li><strong>Run pathfindR Analysis</strong>: Perform enrichment analysis to identify significant pathways.</li>
+      <li><strong>Visualize Results</strong>: Use pathfindR’s visualization tools to explore enriched pathways.</li>
+    </ol>
+  </section>
+</div>
+
+<style>
+  .pathfindr-content {
+    max-width: 95%; /* Adjust this percentage for desired width */
+    margin: 20px auto;
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    font-family: Arial, sans-serif;
+  }
+  .pathfindr-content header h1 {
+    font-size: 2em;
+    color: #4a4a4a;
+    text-align: center;
+  }
+  .pathfindr-content .intro {
+    text-align: center;
+    font-size: 1.1em;
+    color: #666;
+    margin-top: -10px;
+  }
+  .pathfindr-content section h2 {
+    font-size: 1.5em;
+    color: #333;
+    border-bottom: 2px solid #eaeaea;
+    padding-bottom: 5px;
+    margin-top: 20px;
+  }
+  .pathfindr-content h3 {
+    font-size: 1.2em;
+    color: #555;
+    margin-top: 15px;
+  }
+  .pathfindr-content p, .pathfindr-content ul, .pathfindr-content ol {
+    font-size: 1em;
+    color: #333;
+    line-height: 1.6;
+  }
+  .pathfindr-content ul, .pathfindr-content ol {
+    margin-top: 0;
+  }
+</style>

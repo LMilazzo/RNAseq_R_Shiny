@@ -1,0 +1,83 @@
+<!-- Save this as deseq2_intro.html -->
+
+<div class="deseq2-content">
+  <header>
+    <h1>DESeq2: Differential Gene Expression Analysis in R</h1>
+    <p class="intro">The <strong>DESeq2</strong> is a powerful R package used for analyzing differential gene expression (DGE) data, especially in RNA-seq experiments. This guide explores its applications, key concepts, and how it can aid in understanding gene expression changes across different conditions.</p>
+  </header>
+
+  <section>
+    <h2>Overview of DESeq2</h2>
+    <p>DESeq2 uses statistical models to identify genes with significant changes in expression levels between experimental conditions. By normalizing data and testing for significance, DESeq2 provides reliable insights into gene regulation across different biological states.</p>
+  </section>
+
+  <section>
+    <h2>Key Concepts</h2>
+    <h3>Fold Change</h3>
+    <p>Fold change measures how a gene's expression level changes between conditions. In DESeq2, fold changes are calculated on a log2 scale:</p>
+    <ul>
+      <li><strong>Positive fold change</strong>: Upregulation (higher expression in the treatment group).</li>
+      <li><strong>Negative fold change</strong>: Downregulation (lower expression in the treatment group).</li>
+    </ul>
+
+    <h3>Normalization Methods</h3>
+    <p>DESeq2 uses normalization to correct for differences in sequencing depth and ensure comparability between samples. Common methods include:</p>
+    <ul>
+      <li><strong>Size Factor Normalization</strong>: Adjusts counts for total reads across samples, correcting for library size differences.</li>
+      <li><strong>Variance Stabilization</strong>: Stabilizes variance across count levels, improving data quality for downstream analysis.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Applications of DESeq2</h2>
+    <p>DESeq2 is widely used across fields such as:</p>
+    <ul>
+      <li><strong>Biomedicine</strong>: Identifying disease-associated genes by comparing gene expression in healthy and diseased tissues.</li>
+      <li><strong>Drug Discovery</strong>: Evaluating gene expression changes in response to treatment to identify pathways affected by drugs.</li>
+      <li><strong>Environmental Biology</strong>: Assessing gene expression responses to environmental changes in plants and animals.</li>
+    </ul>
+  </section>
+</div>
+
+<style>
+  .deseq2-content {
+    max-width: 95%; /* Adjust this percentage for desired width */
+    margin: 20px auto;
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    font-family: Arial, sans-serif;
+  }
+  .deseq2-content header h1 {
+    font-size: 2em;
+    color: #4a4a4a;
+    text-align: center;
+  }
+  .deseq2-content .intro {
+    text-align: center;
+    font-size: 1.1em;
+    color: #666;
+    margin-top: -10px;
+  }
+  .deseq2-content section h2 {
+    font-size: 1.5em;
+    color: #333;
+    border-bottom: 2px solid #eaeaea;
+    padding-bottom: 5px;
+    margin-top: 20px;
+  }
+  .deseq2-content h3 {
+    font-size: 1.2em;
+    color: #555;
+    margin-top: 15px;
+  }
+  .deseq2-content p, .deseq2-content ul {
+    font-size: 1em;
+    color: #333;
+    line-height: 1.6;
+  }
+  .deseq2-content ul {
+    margin-top: 0;
+  }
+</style>

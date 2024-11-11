@@ -2,8 +2,9 @@
 
 
 # run_app.R
-library(shiny)
 
 source("PackageSetup.R", echo = TRUE)
+
+library(shiny)
 
 runApp('App', launch.browser = TRUE)

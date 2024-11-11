@@ -3,7 +3,7 @@ packages <- c("shiny", "shinythemes", "DT", "dplyr", "readr",
               "ggplot2", "ggplotify", "patchwork", "matrixStats", "circlize", 
               "colourpicker", "ggbeeswarm", "ggrepel", 
               "pathfindR", "tidyr", "shinyjs", "plotly", 
-              "htmlwidgets", "png", "leaflet", "devtools")
+              "htmlwidgets", "png", "leaflet", "devtools", "shiny")
 
 # Function to check and install missing packages
 install_if_missing <- function(pkg) {

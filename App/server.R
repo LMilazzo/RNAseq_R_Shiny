@@ -180,7 +180,6 @@ server <- function(input, output) {
     counts <- counts %>% tibble::column_to_rownames('gene_id')
     sample_cols <- grep("^\\.", colnames(counts), value = TRUE)
     non_sample_cols <- grep("^[^.]", colnames(counts), value = TRUE)
-    
     #Check if enough samples
     if (length(sample_cols) < 2) {
       return("Insufficient Sample Columns Error")
@@ -188,7 +187,7 @@ server <- function(input, output) {
     
     # Keep only sample columns
     counts <- counts %>% select(all_of(sample_cols))
-    
+
     #return data
     return(list(as.matrix(counts), gene_names))
     
@@ -293,6 +292,7 @@ server <- function(input, output) {
       des <- paste0("~ ", design_concat())
       des <- as.formula(des)
       print(des)
+      print(dim(countdata))
       
       ddsc <- DESeqDataSetFromMatrix(countData = round(countdata),
                                      colData = metadata,
@@ -302,10 +302,14 @@ server <- function(input, output) {
       
       deseqdataset <- DESeq(ddsc)
       
+      print('here')
+      print(deseqdataset)
       # ====== Reactive Assignment ======
       ddsc(deseqdataset)
       results_ddsc(data.frame(results(ddsc())))
-      vstObject <- vst(ddsc(), blind = TRUE)
+      print('before suspect')
+      vstObject <- vst(ddsc(), blind = TRUE, nsub = 50)
+      print('after suspect')
       normalized_counts(data.frame(counts(ddsc(), normalized = TRUE)))
       vst_counts(data.frame(assay(vstObject)))
       vst_Obj(vstObject)
@@ -644,7 +648,6 @@ server <- function(input, output) {
     names(kegg)[1] <- "ID"
     names(kegg)[2] <- "all_pathway_genes"
     
-    
     showModal(modalDialog("Finding Paths...", footer = NULL))
     #Run pathfinder
     
@@ -655,6 +658,16 @@ server <- function(input, output) {
                            enrichment_threshold = 0.05,
                            iterations = 25,
                            list_active_snw_genes = TRUE)
+      
+      if(ncol(res) == 0 || nrow(res) == 0){
+        showErrorModal('No Enriched Terms were found for the provided pin')
+        return()
+      }
+      
+      if(length(intersect(colnames(res), colnames(kegg))) == 0){
+        showErrorModal("No common variables in pin and pathfinder output")  
+        return()
+      }
       
       res <- left_join(res, kegg)
       

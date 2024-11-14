@@ -441,7 +441,9 @@ tabPanel("Case vs. Control",
     uiOutput('cases_select_box'),
     
     sidebarPanel(width = 4,
-              
+      
+      checkboxInput('repOnly', "Representative pathways only", value = TRUE),
+      
       uiOutput('sample_conditions_PreviewTable11')
               
     ),

@@ -125,7 +125,8 @@ server <- function(input, output) {
         div(
           p(span(diff, style="color: red;"), 
             " rows were removed from the data set with row sums < 10")
-          ), easyClose = TRUE, footer=NULL))
+          ), easyClose = TRUE, footer=NULL)
+      )
     
     #disable other options
     hide('Page1_Upload_Options')
@@ -302,14 +303,10 @@ server <- function(input, output) {
       
       deseqdataset <- DESeq(ddsc)
       
-      print('here')
-      print(deseqdataset)
       # ====== Reactive Assignment ======
       ddsc(deseqdataset)
       results_ddsc(data.frame(results(ddsc())))
-      print('before suspect')
       vstObject <- vst(ddsc(), blind = TRUE, nsub = 50)
-      print('after suspect')
       normalized_counts(data.frame(counts(ddsc(), normalized = TRUE)))
       vst_counts(data.frame(assay(vstObject)))
       vst_Obj(vstObject)
@@ -563,12 +560,13 @@ server <- function(input, output) {
         )
       )
     }else{
-      gene_names_abundance(normalized_counts() %>% 
-                             mutate(Gene_symbol = rownames(normalized_counts())) %>%
+      
+      gene_names_abundance(gene_names() %>%
+                             mutate(Gene_symbol = gene_name) %>%
                              select(Gene_symbol))
       
       pathfinder_abundance_data(normalized_counts() %>% 
-                                  mutate(Gene_symbol = rownames(normalized_counts())))
+                                  mutate(Gene_symbol = gene_names_abundance()$Gene_symbol))
     
       
       data <- results_ddsc() %>% 
@@ -588,7 +586,7 @@ server <- function(input, output) {
       
       show("TabSet2_Pathway_Analysis")
       hide('pathfinder_option_buttons')
-      hide('about_PathfindR')
+      hide('about_pathfinder')
     
     }
       
@@ -634,7 +632,7 @@ server <- function(input, output) {
     
     show("TabSet2_Pathway_Analysis")
     hide('pathfinder_option_buttons')
-    hide('about_PathfindR')
+    hide('about_pathfinder')
     
   })
   # Function to actually run
@@ -808,7 +806,7 @@ server <- function(input, output) {
       
       hide('about_pathfinder')
       show("TabSet2_Pathway_Analysis")
-      hide('about_PathfindR')
+      
     }
     
   })
@@ -1878,7 +1876,15 @@ server <- function(input, output) {
         plot <- pathwayheatmap(pathfinder_results(), 5)
       }
      
-      plot10(plot[[2]])
+      if(is.null(plot)){
+        plot10(NULL)
+        return(span("No searched genes show diffrential expression",style="color: red;"))
+      }
+      
+      plotlie <- plot[[2]]
+      plotlie$x$layout$width <- plotlie$x$layout$width + 200
+      plotlie$x$layout$height <- plotlie$x$layout$height + 200
+      plot10(plotlie)
       
       output$plot <- renderPlot({
         plot[[1]] +
@@ -1893,7 +1899,7 @@ server <- function(input, output) {
       
       plotOutput('plot', 
                  width = paste0(plot[[2]]$x$layout$width + 200, "px"), 
-                 height = paste0(plot[[2]]$x$layout$height + 200, "px"))
+                 height = paste0(plot[[2]]$x$layout$height + 275, "px"))
       
       
     })
@@ -1949,7 +1955,7 @@ server <- function(input, output) {
                                    data = pathfinder_results(),
                                    abundance = ab,
                                    cases = caseSamples,
-                                   repOnly = TRUE, 
+                                   repOnly = input$repOnly, 
                                    pathways = NULL)
       
       page11_height(plotdata[[2]])
@@ -1963,7 +1969,7 @@ server <- function(input, output) {
 
     output$case_plot_ui <- renderUI({
       if(is.null(pathfinder_abundance_data()) && is.null(normalized_counts())){
-        span("Abundance or counts Data is Needed for this Visual",style="color: red;")
+        span("Abundance or counts data is needed for this visual",style="color: red;")
       }else{
         plotOutput('case_map_plot', height = page11_height(), width = page11_width())
       }
@@ -2053,6 +2059,10 @@ server <- function(input, output) {
     
     output$Single_pathway_plot_ui <- renderUI({
     
+      if(is.null(pathfinder_abundance_data()) && is.null(normalized_counts())){
+        return(span("Abundance or counts data is needed for this visual",style="color: red;"))
+      }
+      
       if(!tolower(input$Single_pathway_plot_search) %in% tolower(pathfinder_results()$Term_Description)){
         
       }else{

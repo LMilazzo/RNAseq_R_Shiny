@@ -10,56 +10,56 @@ server <- function(input, output) {
 #~~~~~######_____________Reactive Values______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #----
-  # Determines when to run DESeq2
-  run_question <- reactiveVal(NULL) 
   
   # Uploaded raw counts data
-  raw_counts <- reactiveVal(NULL)
+  RCV.RAW_COUNTS <- reactiveVal(NULL)
   
   # Extracted gene names from the raw counts
-  gene_names <- reactiveVal(NULL)
+  RCV.GENE_NAMES <- reactiveVal(NULL)
   
   # Filtered counts based on some criteria
-  filtered_counts <- reactiveVal(NULL)
+  RCV.FILTERED_COUNTS <- reactiveVal(NULL)
   
   # Uploaded metadata file
-  metaData <- reactiveVal(NULL)
+  RCV.META_DATA <- reactiveVal(NULL)
   
   # The DESeq2 object
-  ddsc <- reactiveVal(NULL)
+  RCV.DDSC <- reactiveVal(NULL)
   
   # Dataframe of DESeq2 results
-  results_ddsc <- reactiveVal(NULL)
+  RCV.RESULTS_DDSC <- reactiveVal(NULL)
   
   # Normalized counts from the DESeq2 object
-  normalized_counts <- reactiveVal(NULL)
+  RCV.NORMALIZED_COUNTS <- reactiveVal(NULL)
   
   # Variance stabilized counts object from DESeq2
-  vst_Obj <- reactiveVal(NULL)
+  RCV.VST_OBJ <- reactiveVal(NULL)
   
   # Variance stabilized counts from the vst_Obj
-  vst_counts <- reactiveVal(NULL)
+  RCV.VST_COUNTS <- reactiveVal(NULL)
   
   # Pathfinder results
-  pathfinder_results <- reactiveVal(NULL)
-
+  RCV.PATHWAY_RESULTS <- reactiveVal(NULL)
+  
   # Pathfinder old experiment uploads
-  pathfinder_abundance_data <- reactiveVal(NULL)
+  RCV.PATHWAY_ABUNDANCE <- reactiveVal(NULL)
   
   #Abunance data gene names
-  gene_names_abundance <- reactiveVal(NULL)
+  RCV.PATHWAY_GENES <- reactiveVal(NULL)
   
   #Pathfinder meta data
-  pathfinder_metaData <- reactiveVal(NULL)
+  RCV.PATHWAY_META_DATA <- reactiveVal(NULL)
   
 #---- 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#~~~~~######_______________Observables________________######~~~~~#
+#~~~~~######_______________WORKFLOW________________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-#Differential Expression Things_____________________________________________________
+#Differential Expression Things______________________________________________
 
-  #START an EXPERIMENT
+  #-----------NEW EXPERIMENT-------
+  
+  #UPLOAD MODAL MESSAGE
   observeEvent(input$start_new_experiment,{
     showModal(
       modalDialog(
@@ -68,67 +68,63 @@ server <- function(input, output) {
           p("Accepted File Types:  .csv   .tsv "),
           p("Format: ( gene_id, gene_name, .samples... ) "),
           p("The gene id column should contain a unique identifier for every row"),
-          fileInput("merged_gene_counts_uploaded_file", "Counts Matrix"),
+          fileInput("counts_file", "Counts Matrix"),
         
           h5("Sample Conditions Table"),
           p("Accepted File Types:  .csv   .tsv "),
           p("Format: (sample, conditions...) "),
           p("Sample column should include sample names that are found in your experiment data"),
-          fileInput("meta_data_new_experiment", "Sample Conditions")
+          fileInput("deg_meta_1_file", "Sample Conditions")
         ),
-        footer = actionButton("Finish_New_Experiment_Upload", "Finish"), easyClose = TRUE
+        footer = actionButton("read_cnts_and_meta1", "Finish"), easyClose = TRUE
       )
     )
   })
-  observeEvent(input$Finish_New_Experiment_Upload, {
+  
+  #READING FILES RAW COUNTS AND META DATA
+  observeEvent(input$read_cnts_and_meta1, {
     
     removeModal()
     
-    #Check If uploads uploaded properly
-    if( is.null(input$merged_gene_counts_uploaded_file) 
-        || is.null(input$meta_data_new_experiment)){
-      
+    #               REQUIRE BOTH IMPORTS
+    #_____________________________________________________
+    if( is.null(input$counts_file) || is.null(input$deg_meta_1_file)){
       showErrorModal('A file was not uploaded properly try again')
       return()
     }
   
-    #Read counts matrix
-    counts_geneNames <- readCountsUpload(input$merged_gene_counts_uploaded_file$datapath)
+    #               READ THE COUNTS FILE FIRST
+    #     return(gene_names, raw_counts, filtered_counts)
+    #____________________________________________________________
+    df_list <- readCountsUpload(input$counts_file$datapath)
+    if(is.null(df_list)){ return() }
     
-    if(is.null(counts_geneNames)){
-      return()
-    }
+    gene_names <- df_list[[1]]
+    raw_counts <- df_list[[2]]
+    filtered_counts <- df_list[[3]]
     
-    counts <- counts_geneNames[[1]]
-    gene_names <- counts_geneNames[[2]]
-    
-    #Read meta data file
-    meta_data <- readMetaData(input$meta_data_new_experiment$datapath)
-    
-    if(is.null(meta_data)){
-      return()
-    }
-    
-    #Filter counts
-    filteredCounts <- filterCounts(data.frame(counts))
+    #               READ THE META DATA FILE
+    #__________________________________________________________________
+    meta_data <- readMetaData(input$deg_meta_1_file$datapath)
+    if(is.null(meta_data)){ return() } 
   
-    # ====== Reactive Values ======
-    raw_counts(data.frame(counts))
-    gene_names(data.frame(gene_names))
-    filtered_counts(filteredCounts)
-    metaData(meta_data)
+    #                 SET GLOBAL VARIABLES
+    #_____________________________________________________
+                    RCV.GENE_NAMES(gene_names)
+                    RCV.RAW_COUNTS(raw_counts)
+                RCV.FILTERED_COUNTS(filtered_counts)
+                     RCV.META_DATA(meta_data)
     
-    #How many rows were filtered
-    diff <- nrow( raw_counts() ) - nrow( filtered_counts() )
-    showModal(
-      modalDialog(
-        div(
-          p(span(diff, style="color: red;"), 
-            " rows were removed from the data set with row sums < 10")
-          ), easyClose = TRUE, footer=NULL)
-      )
+    #             SHOW HOW MANY WERE FILTERED
+    #_____________________________________________________
+    diff <- nrow(raw_counts) - nrow(filtered_counts)
     
-    #disable other options
+    showModal(modalDialog(div(p(span
+      (diff, style="color: red;"), " rows were filtered from the dataset"
+    )),easyClose = TRUE, footer=NULL))
+    
+    #               ADJUST UI
+    #_____________________________________________________
     hide('Page1_Upload_Options')
     show('run_DESeq2')
     show('pg1table2')
@@ -136,94 +132,28 @@ server <- function(input, output) {
     hide('about_DESeq2')
     
   })
-  #Returns (counts, gene_names)
-  readCountsUpload <- function(fileDataPath){
-    
-    #DATA ASSERTIONS
-    
-    #Check file type
-    if(!grepl('\\.(csv|tsv)$', fileDataPath, ignore.case = TRUE)) {
-      showErrorModal('The counts matrix file is not a readable file')
-      return()
-    }
-    
-    #Read the file as tsv
-    if(grepl('\\.tsv$', fileDataPath, ignore.case = TRUE)){
-      counts <- read.csv(fileDataPath, sep = "\t")
-    }
-    #Read the file as a csv
-    else if(grepl('\\.csv$', fileDataPath, ignore.case = TRUE)){
-      counts <- read.csv(fileDataPath)
-    }
-    #Unreadable file type
-    else{
-      showErrorModal('The counts matrix file is not a readable file')
-      return()
-    }
-    
-    #Check for req columns
-    if(! all( c('gene_id', 'gene_name') %in% colnames(counts) ) ){
-      showErrorModal('Required columns ( gene_id or gene_name ) are missing in the counts matrix')
-      return()
-    }
-    
-    #Check duplicate ids
-    if(anyDuplicated(counts$gene_id)){
-      showErrorModal('There were duplicate ids in the counts matrix')
-      return()
-    }
-    
-    #DATA MANIPUTLATION
-    
-    #Get gene names and ids 
-    gene_names <- counts %>% select(gene_name, gene_id)
-    
-    counts <- counts %>% tibble::column_to_rownames('gene_id')
-    sample_cols <- grep("^\\.", colnames(counts), value = TRUE)
-    non_sample_cols <- grep("^[^.]", colnames(counts), value = TRUE)
-    #Check if enough samples
-    if (length(sample_cols) < 2) {
-      return("Insufficient Sample Columns Error")
-    }
-    
-    # Keep only sample columns
-    counts <- counts %>% select(all_of(sample_cols))
-
-    #return data
-    return(list(as.matrix(counts), gene_names))
-    
-  }
-  #Filter counts
-  filterCounts <- function(counts){
-    
-    keep <- rowSums(counts) > 10
-    
-    counts <- counts[keep,]
-    
-    counts <- counts
-    
-    counts <- as.matrix(counts)
-    
-    return(counts)
-  }
-  #Running
-  interaction_counter <- reactiveVal(0)
-  design_concat <- reactiveVal(NULL)
+  
+  #RUNNING DESEQ2
+  
+  #FORMULA INTERACTION UI TRACKER
+  RCV.INT_COUNTER <- reactiveVal(0)
+  
+  #FORMULA DESIGN
+  RCV.DESIGN_FORMULA_STRING <- reactiveVal(NULL)
+  
+  #DESIGN FORMULA CREATION MODAL
   observeEvent(input$run_DESeq2,{
     
-    #Design Creation A lot of parts / quite complex 
-    #----
-    vars <- colnames(metaData())
+    #     SET LOCAL SAMPLE NAMES
+    #__________________________________
+    vars <- colnames( RCV.META_DATA() )
     
-    output$inter_space <- renderUI({
-      if(interaction_counter() <= 0 ){
-        return()
-      }
-      lapply(1:interaction_counter(), function(i) {
-        createInteractionUI(i, vars)
-      })
-    })
+    #INTERACTION ASSEMBLY===============================================
+    
+    #         FUNCTION TO CREATE AN INTERACTION SELECTION ELEMENT
+    #___________________________________________________________________
     createInteractionUI <- function(index, vars){
+      
       fluidRow(
         column(6, selectInput(paste0("interaction_", index, "_a"), 
                               paste("Interaction Term", index, "Variable 1:"), 
@@ -232,91 +162,177 @@ server <- function(input, output) {
                               paste("Interaction Term", index, "Variable 2:"), 
                               choices = vars))
       )
+      
     }
-    observeEvent(refresh(),{design_concat(concatDesign(input, output, session, interaction_counter()))})
-    observeEvent(input$addinter, {
-      interaction_counter(interaction_counter() + 1)
+    
+    # UI ADDING A INTERACTION SELECTION ELEMNT OF EACH INTERACTION NEEDED
+    #___________________________________________________________________
+    output$inter_space <- renderUI({
+      
+      #IF NO INTERACTIONS SHOW NOTHING
+      if( RCV.INT_COUNTER() <= 0 ){ return() }
+      
+      #CREATE A UI INTERACTION ELEMENT FOR ALL INTERACTIONS NEEDED
+      lapply(1: RCV.INT_COUNTER(), function(index) { createInteractionUI(index, vars) })
+      
     })
-    observeEvent(input$mininter, {
-      if(interaction_counter() > 0){
-        interaction_counter(interaction_counter() - 1)
-      }
+    
+    #ADJUSTING INTERACTIVE DESIGN======================================
+    
+    #           CLOCK USED TO REFRESH FORMULA PERIODICALLY
+    #___________________________________________________________________
+    refresh <- reactive({
+      invalidateLater(100)
+      Sys.time()
     })
-    concatDesign <- function(input, output, session, i){
+    
+    #     FUNCTION FOR CONCATANATION OF DATA INTO FORMULA STRING
+    #___________________________________________________________________
+    concatDesign <- function(input, output, session, INT_COUNTER){
       
-      main_effects <- input$dvars
+      #MAIN FORMULA ELEMENTS  X + Y
+      main_effects <- input$main_effects
+      design_parts <- c(main_effects)
       
-      dparts <- c(main_effects)
-      
-      if(i > 0){
-        for (j in 1:i) {
+      #ADD ANY INTERACTION FORMULAS TO THE DESIGN PART LIST
+      if(INT_COUNTER > 0){
+        for (j in 1:INT_COUNTER) {
           var1 <- input[[paste0("interaction_", j, "_a")]]
           var2 <- input[[paste0("interaction_", j, "_b")]]
           
           # If both variables for the interaction are selected, add the interaction term
           if (!is.null(var1) && !is.null(var2)) {
             interaction_term <- paste(var1, var2, sep = ":")
-            dparts <- c(dparts, interaction_term)
+            design_part <- c(design_parts, interaction_term)
           }
+          
         }
       }
       
-      design_formula <- paste(dparts, collapse = " + ")
+      #     FORMULATE A STRING OF ALL DESIGN PARTS SEP BY +
+      #_______________________________________________________
+      design_formula <- paste(design_parts, collapse = " + ")
       
       return(design_formula)
       
     }
-    refresh <- reactive({
-      invalidateLater(100)
-      Sys.time()
+    
+    #         UPON CLOCK UPDATE REFRESH THE FORMULA STRING
+    #___________________________________________________________________
+    observeEvent(refresh(),{
+      RCV.DESIGN_FORMULA_STRING(concatDesign(input, output, session, RCV.INT_COUNTER()))
     })
     
-    showModal(modalDialog(div(
-      p("Experimental design"),
-      renderText({design_concat()}),
-      checkboxGroupInput('dvars', 'Variables', choices = vars, inline = TRUE),
-      uiOutput("inter_space"),
-      actionButton('addinter', "Add interaction"),
-      actionButton('mininter', "Remove interaction"),
-    ),footer = tagList(actionButton('design_submit', "Run",style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;")), easyClose = TRUE))
+    #     ADD AND SUBTRACT INTERACTION SELECTION UI ELEMENTS
+    #___________________________________________________________________
+    observeEvent(input$plusinter, {
+      RCV.INT_COUNTER(RCV.INT_COUNTER() + 1)
+    })
+    observeEvent(input$mininter, {
+      if(RCV.INT_COUNTER > 0){
+        RCV.INT_COUNTER(RCV.INT_COUNTER - 1)
+      }
+    })
+    
+    #MAIN UI MODAL FOR==================================================
+    
+    showModal(modalDialog(
+      div(
+        p("Experimental design"),
+        renderText({RCV.DESIGN_FORMULA_STRING()}),
+        checkboxGroupInput('main_effects', 'Variables', choices = vars, inline = TRUE),
+        uiOutput("inter_space"),
+        actionButton('plusinter', "Add interaction"),
+        actionButton('mininter', "Remove interaction"),
+      ),
+      footer = tagList(actionButton('design_submit', "Run", 
+      style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;")), 
+      easyClose = TRUE
+    ))
+  
   })
+  
+  #SUBMIT DESIGN AND RUN DESeq2
   observeEvent(input$design_submit,{
     
-    # Run DESeq2 process
-    metadata <- metaData()
-    countdata <- filtered_counts()
+    #   COPY INFO TO LOCAL VARIABLES
+    # ___________________________________
+    metadata <- RCV.META_DATA()
+    countdata <- RCV.FILTERED_COUNTS() %>% as.matrix()
     
-    # condition <- metadata[,1]
+    #   CREATE DESIGN AS A FORMULA
+    #___________________________________
+    des_formula <- paste0("~ ", RCV.DESIGN_FORMULA_STRING())
+    des_formula <- as.formula(des_formula)
+    
+    #   DEBUGGING PRINTING 
+    #_________________________
+    print(des_formula)
+    print(dim(countdata))
+    
     
     tryCatch({
       
-      des <- paste0("~ ", design_concat())
-      des <- as.formula(des)
-      print(des)
-      print(dim(countdata))
-      
+      #         CREATE THE DESeq DATA SET   
+      #_____________________________________________________________
       ddsc <- DESeqDataSetFromMatrix(countData = round(countdata),
                                      colData = metadata,
-                                     design = des)
+                                     design = des_formula)
       
       showModal(modalDialog("Running DESeq...", footer = NULL))
       
-      deseqdataset <- DESeq(ddsc)
+      YourDESeqDataSet <- DESeq(ddsc)
       
-      # ====== Reactive Assignment ======
-      ddsc(deseqdataset)
-      results_ddsc(data.frame(results(ddsc())))
-      vstObject <- vst(ddsc(), blind = TRUE, nsub = 50)
-      normalized_counts(data.frame(counts(ddsc(), normalized = TRUE)))
-      vst_counts(data.frame(assay(vstObject)))
-      vst_Obj(vstObject)
+      #                     SELECT CONTRASTS
+      #_____________________________________________________________
+      contrast_list <- list()
+      #Make options
+      for (col_name in colnames(colData(ddsc))) {
+        levels <- levels(colData(ddsc)[[col_name]])
+        combinations <- combn(levels, 2, simplify = FALSE)
+        for (combo in combinations) {
+          combo_name1 <- paste(combo, collapse = " vs. ")
+          combo_name2 <- paste(rev(combo), collapse = " vs. ")
+          contrast_list[[combo_name1]] <- c(col_name, combo)
+          contrast_list[[combo_name2]] <- c(col_name, rev(combo))
+        }
+      }
       
-      showModal(modalDialog("DESeq complete with no fatal errors", easyClose = TRUE, footer = NULL))
+      showModal(modalDialog(
+        div(selectInput("contrast", "Select Contrast", choices = names(contrast_list))),
+        footer = actionButton('finish', "Complete")
+      ))
       
-      hide("run_DESeq2")
-      hide('preRun_Data_Preview')
-      show("TabSet1_Diffrential_Expression_Analysis")
+      #         FINISH THE PROCESS
+      #___________________________________________________________
+      observeEvent(input$finish,{
+        
+        cont <- contrast_list[[input$contrast]]
+        
+        #         SET GLOBAL VARIABLES FOR THE EXPERIMENT RESULTS
+        #___________________________________________________________________
+        RCV.DDSC(YourDESeqDataSet)
+                                  
+        RCV.RESULTS_DDSC( as.data.frame(results(YourDESeqDataSet, contrast = cont)))
+        
+        RCV.VST_OBJ( vst(YourDESeqDataSet, blind = TRUE, nsub = 50) )
       
+        RCV.VST_COUNTS( as.data.frame(assay(RCV.VST_OBJ())) )
+        
+        RCV.NORMALIZED_COUNTS( as.data.frame(counts(YourDESeqDataSet, normalized = TRUE)) )
+        
+        #           EXIT MESSAGE
+        #_____________________________
+        showModal(modalDialog("DESeq complete with no fatal errors", easyClose = TRUE, footer = NULL))
+        
+        #           UPDATE UI
+        # _______________________________
+        hide("run_DESeq2")
+        hide('preRun_Data_Preview')
+        show("TabSet1_Diffrential_Expression_Analysis")
+        
+      })
+        
     }, error = function(e) {
       
       showErrorModal(paste("Error in DESeq2 process:", e$message))
@@ -326,7 +342,9 @@ server <- function(input, output) {
   })
   
   
-  #Review an Experiment
+  #-----------OLD EXPERIMENT-------
+  
+  #UPLOAD MODAL MESSAGE
   observeEvent(input$start_old_experiment,{
     showModal(
       modalDialog(
@@ -337,57 +355,61 @@ server <- function(input, output) {
           p("- The gene id column should contain a unique identifier for every row"),
           p("- Sample counts may be included and are recommended in reviewing an experiment for all features"),
           p("- Samples should each have their own column with the sample name proceeding a '.' (standard dot/period)"),
-          fileInput("previous_deg_upload", "DEG Experiment"),
+          fileInput("deg_file", "DEG Experiment"),
           
           h5("Sample Conditions Table"),
           p("Accepted File Types:  .csv   .tsv "),
           p("Format: (sample, conditions...) "),
           p("Sample column should include sample names that are found in your experiment data"),
-          fileInput("meta_data_old_experiment", "Sample Conditions")
-        ),footer = actionButton("Finish_Old_Experiment_Upload", "Finish"), easyClose = TRUE
+          fileInput("deg_meta_2_file", "Sample Conditions")
+        ),footer = actionButton("read_deg_and_meta2", "Finish"), easyClose = TRUE
       )
     )
   })
-  observeEvent(input$Finish_Old_Experiment_Upload, {
+  
+  #READING DEG AND META DATA
+  observeEvent(input$read_deg_and_meta2, {
     
     removeModal()
     
-    if( is.null(input$previous_deg_upload) 
-        || is.null(input$meta_data_old_experiment)){
-      
+    #               REQUIRE BOTH IMPORTS
+    #_____________________________________________________
+    if( is.null(input$deg_file) || is.null(input$deg_meta_2_file)){
       showErrorModal('A file was not uploaded properly try again')
       return()
     }
     
-    #Read metadata
-    meta_data <- readMetaData(input$meta_data_old_experiment$datapath)
     
-    if(is.null(meta_data)){
-      return()
-    }
+    #               READ META DATA FILE
+    #____________________________________________________
+    meta_data <- readMetaData(input$deg_meta_2_file$datapath)
+    if(is.null(meta_data)){ return() } 
     
-    #Read DEG file
-    objects <- readDEGFile(input$previous_deg_upload$datapath, meta_data)
     
-    if(is.null(objects)){
-      return()
-    }
+    #               READ DEG FILE
+    # (results, gene names, normalized counts, vst counts, vst object)
+    #____________________________________________________
+    df_list <- readDEGFile(input$deg_file$datapath, meta_data)
+    if(is.null(df_list)){ return() }
     
-    results <- objects[[1]]
-    geneNames <- objects[[2]]
-    normalizedCounts <- objects[[3]]
-    vstCounts <- objects[[4]]
-    vstObject <- objects[[5]]
+    #               SETTING GLOBAL VARIABLES
+    #_____________________________________________________
+    RCV.RESULTS_DDSC(df_list[[1]])
     
-    results_ddsc(results)
-    gene_names(geneNames)
-    normalized_counts(normalizedCounts)
-    raw_counts(normalizedCounts)
-    vst_counts(vstCounts)
-    vst_Obj(vstObject)
-    metaData(meta_data)
+    RCV.GENE_NAMES(as.data.frame(df_list[[2]]))
     
-    #disable other options
+    RCV.NORMALIZED_COUNTS(df_list[[3]])
+    
+    RCV.RAW_COUNTS(df_list[[3]])
+    
+    RCV.VST_COUNTS(df_list[[4]])
+    
+    RCV.VST_OBJ(df_list[[5]])
+    
+    RCV.META_DATA(meta_data)
+    
+    #             UPDATE UI
+    #____________________________________________
     hide('Page1_Upload_Options')
     hide('preRun_Data_Preview')
     show('pg1table2')
@@ -396,194 +418,81 @@ server <- function(input, output) {
     hide('about_DESeq2')
     
   })
-  #Returns (results, gene names, normalized counts, vst counts, vst object)
-  readDEGFile <- function(fileDataPath, meta_data){
-    
-    #Check file type
-    if(!grepl('\\.(csv|tsv)$', fileDataPath, ignore.case = TRUE)) {
-      showErrorModal('The DEG file is not a readable file')
-      return()
-    }
-    
-    #Read the file as tsv
-    if(grepl('\\.tsv$', fileDataPath, ignore.case = TRUE)){
-      data <- read.csv(fileDataPath, sep = "\t")
-    }
-    #Read the file as a csv
-    else if(grepl('\\.csv$', fileDataPath, ignore.case = TRUE)){
-      data <- read.csv(fileDataPath)
-    }
-    #Unreadable file type
-    else{
-      showErrorModal('The DEG file is not a readable file')
-      return()
-    }
-      
-    #Check for req columns
-    req_col <- c( "gene_id" , "gene_name" , "log2FoldChange" , "padj" )
-    possible_col <- c("gene_id", "gene_name", "baseMean", "log2FoldChange", "lfcSE", "stat", "pvalue", "padj")
-    
-    if(! all( req_col %in% intersect(colnames(data), possible_col) ) ){
-      showErrorModal("DEG file missing either ('gene_id', 'gene_name', 'log2FoldChange', 'padj')")
-      return()
-    }
-    
-    #Check duplicate ids
-    if (anyDuplicated(data$gene_id)) {
-      showErrorModal("Gene ids need to be unique for each row")
-      return()
-    }
-    
-    #GETTINGS THE ACTUAL DATA
-    df <- data %>%
-      select(all_of(intersect(colnames(data), possible_col)))
-    
-    results <- df %>%
-      tibble::column_to_rownames('gene_id') %>%
-      select(-gene_name)
-    
-    #GETTING Gene Names
-    gene_names <- df %>% 
-      select(gene_name, gene_id)
-      
-    #PROCESSING SAMPLE COLUMNS
-    sample_columns <- data[, grep("^\\.", colnames(data), value = TRUE)] # all columns starting with '.'
-      
-    if (ncol(sample_columns) == 0) {
-      
-      showErrorModal("Warning: Some features not available because of missing sample data")
-      
-      return(list(results, gene_names, NULL, NULL, NULL))
-      
-    }else{
-      
-      if (!nrow(sample_columns) == nrow(gene_names)) {
-        showErrorModal("Error: number of rows in the sample data != rows in gene names list")
-        return()
-      }
-      
-      # Set row names for sample columns
-      rownames(sample_columns) <- gene_names$gene_id
-      
-      if( nrow(meta_data) != ncol(sample_columns) ){
-        showErrorModal("Error: Number of samples in meta data is not the same as the number of samples in the counts data")
-        return()
-      }
-      
-      counts <- round(sample_columns)    
-      
-      v <- varianceStabilizingTransformation(as.matrix(counts), blind=TRUE)
-      se <- SummarizedExperiment(assays = list(counts = v), colData = meta_data)
-      vsd <- DESeqTransform(se)
-    }
-      
-    return(list(results, gene_names, sample_columns, data.frame(v), vsd))
-  }
   
-  
-  #Uploading and Reading Meta Data
-  output$MetaData_Upload_Module <- renderUI({
-   
-    div(
-      h5("Sample Conditions Table"),
-      p("Accepted File Types:  .csv   .tsv "),
-      p("Format: (sample, conditions...) "),
-      p("Sample column should include sample names that are found in your experiment data"),
-      fileInput("meta_data_conditions_uploaded_file", "Sample Conditions")
-    )
-    
-    
-  })
-  readMetaData <- function(fileDataPath){
-    
-    #Check file type
-    if(!grepl('\\.(csv|tsv)$', fileDataPath, ignore.case = TRUE)) {
-      showErrorModal('The meta data file is not a readable file')
-      return()
-    }
-    
-    #Read the file as tsv
-    if(grepl('\\.tsv$', fileDataPath, ignore.case = TRUE)){
-      md <- read.csv(fileDataPath, sep = "\t")
-    }
-    #Read the file as a csv
-    else if(grepl('\\.csv$', fileDataPath, ignore.case = TRUE)){
-      md <- read.csv(fileDataPath)
-    }
-    #Unreadable file type
-    else{
-      showErrorModal('The meta data file is not a readable file')
-      return()
-    }
-    
-    # Error: Insufficient columns
-    if (ncol(md) < 2 || !"sample" %in% colnames(md)) {
-      showErrorModal("The meta data file is missing columns")
-      return()
-    }
-    
-    #Enforce sample naming convention
-    md$sample <- ifelse(!grepl("^\\.", md$sample), paste0(".", md$sample), md$sample)
-    md <- md %>%
-      tibble::column_to_rownames('sample')
-    
-    
-    md[] <- lapply(md, as.factor)
-    
-    return(md)
-  }
-
+#----
 #Pathway Analysis Things_____________________________________________________
+  
+  #-----------NEW EXPERIMENT-------
   
   #Continue running with data
   observeEvent(input$Run_pathfinder,{
     
-    if( is.null( results_ddsc() )){
+    #LOCALIZE VARIABLES
+    d.results <- RCV.RESULTS_DDSC()
+    norm <- RCV.NORMALIZED_COUNTS()
+    meta_data <- RCV.META_DATA()
+    
+    #       REQUIRE DEG RESULTS
+    #_________________________________
+    if( is.null( d.results )){
       showErrorModal('No diffrentially expressed gene experiment has been completed')
-      
       return()
     }
     
-    if(is.null(normalized_counts())){
+    #     FORK TO ALLOW COUNTS UPLOAD
+    #__________________________________
+    if(is.null(norm)){
       showModal(
         modalDialog(
-          
           div(
             p("There is no count data for samples in your expirement yet!"),
             p("If you proceed without them you may miss out on some features"),
             p("(Optional)"),
             HTML('<p>Normalized count data includes (gene_name) and samples where each sample name starts with "."</p>'),
-            fileInput('running_pathfinder_but_forgot_abundance', 'Abundance Data'),
-          ), footer = actionButton("continuePF_after_forgotten_data", "Continue"),
+            fileInput('continue_upload_ab_file', 'Abundance Data'),
+          ), footer = actionButton("continue_upload_ab", "Continue"),
           easyClose = FALSE
-          
         )
       )
-    }else{
-      
-      gene_names_abundance(gene_names() %>%
-                             mutate(Gene_symbol = gene_name) %>%
-                             select(Gene_symbol))
-      
-      pathfinder_abundance_data(normalized_counts() %>% 
-                                  mutate(Gene_symbol = gene_names_abundance()$Gene_symbol))
+    }
     
-      
-      data <- results_ddsc() %>% 
-        mutate(gene_id = rownames(results_ddsc())) %>%
-        left_join(gene_names())  %>%
-        select(Gene_symbol = gene_name, logFC = log2FoldChange, Padj = padj) %>%
-        filter(!is.na(Padj))
   
+    else{
+      
+      #       SET UP VARIABLE OBJECTS
+      #___________________________________
+      
+      #DATA
+      data <- d.results
+      data$Gene_symbol <- rownames(data)
+      data <- data %>% 
+        select(Gene_symbol, logFC = log2FoldChange, Padj = padj) %>%
+        filter(!is.na(Padj))
+      
+      #ABUNDANCE DATA / COUNTS
+      counts <- norm
+      counts$Gene_symbol <- rownames(counts)
+      counts <- counts %>% select(Gene_symbol, everything())
+      
+      #GENE NAMES
+      gene_names <- counts %>% select(Gene_symbol)
+      
+      #META DATA
+      md <- meta_data
+      
+      #         RUNNING PATHFINDER
+      #___________________________________
       res <- runPathfindRFunc(data)
+      if(is.null(res)){ return() }
+
+      #       SET GLOBAL VARIABLES
+      #_____________________________________
+      RCV.PATHWAY_RESULTS(res)
+      RCV.PATHWAY_ABUNDANCE(counts)
+      RCV.PATHWAY_GENES(gene_names)
+      RCV.PATHWAY_META_DATA(md)
       
-      if(is.null(res)){
-        return()
-      }
-      
-      pathfinder_metaData(metaData())
-      pathfinder_results(res)
-      
+      #ALTER UI
       show("TabSet2_Pathway_Analysis")
       hide('pathfinder_option_buttons')
       hide('about_pathfinder')
@@ -591,115 +500,77 @@ server <- function(input, output) {
     }
       
   })
+  
   # Extra check for abundance data upload
-  observeEvent(input$continuePF_after_forgotten_data,{
+  observeEvent(input$continue_upload_ab,{
     
-    if(!is.null(input$running_pathfinder_but_forgot_abundance)){
-      
-      abundance <- readPathfinderNewAbundance(input$running_pathfinder_but_forgot_abundance$datapath)
-    
-      if(is.null(abundance)){
-        return()
-      }
-      
-      gene_names_abundance(abundance[[1]])
-      print('here')
-      
-      normalized_counts(abundance[[2]])
-      
-      print('there')
-      
-      pathfinder_abundance_data(abundance[[2]] %>% 
-                                  tibble::rownames_to_column('Gene_symbol'))
-      print('done')
+    #        REQUIRE AN INPUT TO READ
+    #________________________________________
+    if( ! is.null(input$continue_upload_ab_file) ){
+     
+     #READ COUNTS
+     objects <- readPathfinderCountsUpload(input$continue_upload_ab_file$datapath)
+     if(is.null(objects)){ return() }
+     
+     #SET GLOABL VARIABLES
+     RCV.PATHWAY_ABUNDANCE(objects[1])
+     RCV.NORMALIZED_COUNTS(objects[1])
+     RCV.PATHWAY_GENES(objects[2])
+     
     }
     
+    #LOCALIZE VARIABLES
+    d.results <- RCV.RESULTS_DDSC()
+    meta_data <- RCV.META_DATA()
     
-    data <- results_ddsc() %>% 
-      mutate(gene_id = rownames(results_ddsc())) %>%
-      left_join(gene_names())  %>%
-      select(Gene_symbol = gene_name, logFC = log2FoldChange, Padj = padj) %>%
-      filter(!is.na(Padj))
+    #       SET UP VARIABLE OBJECTS
+    #___________________________________
+    #DATA
+    data <- results
+    data$Gene_symbol <- rownames(data)
+    data <- data %>% 
+     select(Gene_symbol, logFC = log2FoldChange, Padj = padj) %>%
+     filter(!is.na(Padj))
     
+    #      RUNNNING PATHWAY ANALYSIS
+    #________________________________________
     res <- runPathfindRFunc(data)
+    if(is.null(res)){ return() }
     
-    if(is.null(res)){
-      return()
-    }
-    
-    pathfinder_metaData(metaData())
-    pathfinder_results(res)
+    #      SET GLOBAL VARIABLES
+    #___________________________________
+    RCV.PATHWAY_RESULTS(res)
+    RCV.PATHWAY_META_DATA(meta_data)
     
     show("TabSet2_Pathway_Analysis")
     hide('pathfinder_option_buttons')
     hide('about_pathfinder')
     
   })
-  # Function to actually run
-  runPathfindRFunc <- function(data_source){
-    
-    #Set up database
-    kegg <- plyr::ldply(pathfindR.data::kegg_genes, data.frame) %>% 
-      mutate(num_genes_in_path = 1) %>% 
-      dplyr::group_by(.data$.id) %>% 
-      dplyr::summarize(X..i.. = paste0(.data$X..i.., collapse = ", "), num_genes_in_path = sum(num_genes_in_path)) 
-    names(kegg)[1] <- "ID"
-    names(kegg)[2] <- "all_pathway_genes"
-    
-    showModal(modalDialog("Finding Paths...", footer = NULL))
-    #Run pathfinder
-    
-    tryCatch({
-      
-      res <- run_pathfindR(data_source,
-                           pin_name_path = "KEGG",
-                           enrichment_threshold = 0.05,
-                           iterations = 25,
-                           list_active_snw_genes = TRUE)
-      
-      if(ncol(res) == 0 || nrow(res) == 0){
-        showErrorModal('No Enriched Terms were found for the provided pin')
-        return()
-      }
-      
-      if(length(intersect(colnames(res), colnames(kegg))) == 0){
-        showErrorModal("No common variables in pin and pathfinder output")  
-        return()
-      }
-      
-      res <- left_join(res, kegg)
-      
-      res_clustered <- cluster_enriched_terms(res,  
-                                              plot_dend = FALSE, 
-                                              plot_clusters_graph = FALSE)
-      
-      showModal(modalDialog("pathfindR complete with no fatal errors", easyClose = TRUE, footer = NULL))
-      
-      return(res_clustered)
-      
-    },
-    error = function(e) {
-      
-      showErrorModal(paste("Error in pathfindR process:", e$message))
-      
-    })
-    
-  }
   
-  #Run with new data
+  #-----------OLD EXPERIMENT-------
+  
+  #UPLOAD AN OLD EXPERIMENT
   observeEvent(input$review_pathfinder_new_data,{
     
-    if(is.null(metaData())){
+    #LOCALIZE VARIABLES
+    old_md <- RCV.META_DATA()
+    
+    
+    #UI DISPLAY 1 IF NEED NEW METADATA
+    if(is.null(old_md)){
       metadata_input <- div(
           h5("Sample Conditions Table"),
           p("Accepted File Types:  .csv   .tsv "),
           p("Format: (sample, conditions...) "),
           p("Sample column should include sample names that are found in your experiment data"),
-          fileInput("meta_data_Old_Pathway_Experiment", "Sample Conditions")
+          fileInput("path_meta_1_file", "Sample Conditions")
       )
-    }else{
+    }
+    #UI DISPLAY 2 THERES ALREADY METADATA OPTIONAL TO UPLOAD A NEW ONE
+    else{
       
-      output$tempTableXX <- renderTable({metaData()}, rownames  = TRUE)
+      output$tempTableXX <- renderTable({old_md}, rownames  = TRUE)
       
       metadata_input <- div(
           h5("Sample Conditions Table"),
@@ -710,250 +581,106 @@ server <- function(input, output) {
           p("Accepted File Types:  .csv   .tsv "),
           p("Format: (sample, conditions...) "),
           p("Sample column should include sample names that are found in your experiment data"),
-          fileInput("meta_data_Old_Pathway_Experiment", "Sample Conditions")
+          fileInput("path_meta_1_file", "Sample Conditions")
         )
     }
     
-    #uploads
+    #UI DISPLAY FOR UPLOADING THE FILES
     showModal(
       modalDialog(
-       
         div( 
         
           HTML('<p>(csv or tsv) containing (ID,	Term_Description,	Fold_Enrichment, occurrence, support,	lowest_p,	highest_p,	non_Signif_Snw_Genes,	Up_regulated,	Down_regulated,	all_pathway_genes,	num_genes_in_path,	Cluster, Status,)</p>'),
           HTML('<br>This is the standard output from a pathfindR clustered experiment.'),
-          fileInput('pathfinder_new_data', 'Pathway Information'),
+          fileInput('pathfinder_output_file', 'Pathway Information'),
         
           HTML('<p>Normalized count data includes (gene_name) and samples where each sample name starts with "."</p>'),
-          fileInput('pathfinder_new_abundance', 'Abundance Data'),
+          fileInput('pathfinder_output_counts', 'Abundance Data'),
           
           metadata_input
           
         ), footer = actionButton("finish_uploading_old_pathfinder", 'Finish'),
         easyClose = TRUE
-        
       )
     )
     
   })
+
+  #COMPLETE UPLOADS AND READ THE FILES
   observeEvent(input$finish_uploading_old_pathfinder,{
     
-    #Check for properly uploaded files
-    if(is.null(input$pathfinder_new_data) || 
-       (is.null(input$meta_data_Old_Pathway_Experiment) && is.null(metaData())) 
-    ){
+    #LOCALIZE VARIABLES
+    old_md <- RCV.META_DATA()
+    
+    #    CHECK IF THE NEEDED FILES WERE UPLOADED
+    #________________________________________________
+    if(is.null(input$pathfinder_output_file) || (is.null(input$path_meta_1_file) && is.null(old_md))){
       showErrorModal('A file was not uploaded properly try again')
       return()
     }
     
+    #
     removeModal()
+    #
     
-    if(is.null(input$pathfinder_new_abundance)){
-      showModal(
-        modalDialog(
-          p('Some features will be limited due to lack of abundance data.'),
-          footer = tagList(
-          actionButton('proceed_without_abundance','Proceed'),
-          actionButton('cancel_without_abundance', 'Cancel'))
-        )
-      )
+    #         READ META DATA FILE
+    #___________________________________
+    if(!is.null(input$path_meta_1_file)){
+      
+      md <- readMetaData(input$path_meta_1_file$datapath)
+      if(is.null(md)){ return() }
+      
     }else{
+      md <- old_md
+    }
+    
+    #           READ DATA FILE
+    #__________________________________
+    res <- readPathfinderOutput(input$pathfinder_output_file$datapath)
+    if(is.null(res)){ return() }
+    
+    #         CHECK / READ COUNTS
+    #_________________________________
+    if(!is.null(input$pathfinder_output_counts)){
       
-      removeModal()
-      
-      if(!is.null(input$meta_data_Old_Pathway_Experiment)){
-        meta_data <- readMetaData(input$meta_data_Old_Pathway_Experiment$datapath)
-        if(is.null(meta_data)){
-          return()
-        }
-      }else if(!is.null(metaData())){
-        meta_data <- metaData()
-      }else{
-        return()
-      }
-      
-      
-      data <- readPathfinderNewData(input$pathfinder_new_data$datapath)
-      
-      if(is.null(data)){
-        return()
-      }
-      
-      if(!is.null(input$pathfinder_new_abundance)){
-        
-        abundance <- readPathfinderNewAbundance(input$pathfinder_new_abundance$datapath)
-        
-        if(is.null(abundance)){
-          return()
-        }
-        
-        gene_names_abundance(abundance[[1]])
-        
-        if(!is.null(gene_names())){
-          diff <- nrow(gene_names()) - nrow(gene_names_abundance())
-          if(!diff == 0){
-            showErrorModal(paste0('There was a difference of ', abs(diff), ' in the number of genes in your DEG and Pathfinder uploads'))
-          }
-        }
-        
-        pathfinder_abundance_data(abundance[[2]] %>% 
-                                    tibble::rownames_to_column('Gene_symbol'))
-        
-      }
-      
-      pathfinder_results(data)
-      pathfinder_metaData(meta_data)
-      
-      hide('about_pathfinder')
-      show("TabSet2_Pathway_Analysis")
+      objects <- readPathfinderCountsUpload(input$pathfinder_output_counts$datapath)
+      if(is.null(objects)){ return() }
+    
+      #     SET GLOBAL VARIABLES
+      #______________________________
+      RCV.PATHWAY_ABUNDANCE(objects[[1]])
+      RCV.PATHWAY_GENES(objects[[2]])
       
     }
     
-  })
-  observeEvent(input$cancel_without_abundance, {
-    removeModal()
-    return()  
-  }) 
-  observeEvent(input$proceed_without_abundance, {
-    
-    removeModal()
-    
-    if(!is.null(input$meta_data_Old_Pathway_Experiment)){
-      meta_data <- readMetaData(input$meta_data_Old_Pathway_Experiment$datapath)
-      if(is.null(meta_data)){
-        return()
-      }
-    }else if(!is.null(metaData())){
-      meta_data <- metaData()
-    }else{
-      return()
-    }
-    
-    data <- readPathfinderNewData(input$pathfinder_new_data$datapath)
-    
-    if(is.null(data)){
-      return()
-    }
-    
-    if(!is.null(input$pathfinder_new_abundance)){
+    #       SET GLOBAL VARIABLES
+    #_________________________________
+    RCV.PATHWAY_RESULTS(res)
+    RCV.PATHWAY_META_DATA(md)
+    if(is.null(RCV.PATHWAY_GENES())){
       
-      abundance <- readPathfinderNewAbundance(input$pathfinder_new_abundance$datapath)
+      data <- res %>%
+        mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
+        select(gene_list)
       
-      if(is.null(abundance)){
-        return()
+      dataDF <- c()
+      
+      for(i in 1:nrow(data) ){
+        dataDF <- c(dataDF, unlist(data[i,1]))
       }
       
-      gene_names(abundance[[1]])
-      pathfinder_abundance_data(abundance[[2]])
+      data <- data.frame(gene_name = dataDF)
+      
+      RCV.PATHWAY_GENES(data %>% unique())
+      
     }
     
-    pathfinder_results(data)
-    pathfinder_metaData(meta_data)
-   
+    #ALTER UI
     hide('about_pathfinder')
-    show("TabSet2_Pathway_Analysis")
+    show('TabSet2_Pathway_Analysis')
+    
   })
-  
-  #Read file functions
-  readPathfinderNewData <- function(fileDataPath){
-    
-    if(!is.null(fileDataPath)){
-      
-      path <- fileDataPath
-      
-      if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
-        showErrorModal('An unreadable file type was submitted (use csv or tsv)')
-        return()
-      }
-      
-      if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
-        new_data <- read.csv(path, sep = "\t")
-      } else {
-        new_data <- read.csv(path)
-      }
-      
-      req_cols <- c("ID","Term_Description","Fold_Enrichment","occurrence",
-                    "support","lowest_p","highest_p","non_Signif_Snw_Genes",
-                    "Up_regulated","Down_regulated","all_pathway_genes",
-                    "num_genes_in_path","Cluster","Status")
-      
-      if(!all(req_cols %in% colnames(new_data))){
-        showErrorModal('There are some missing cols in the uploaded set')
-        return()
-      }
-     
-      #Assert correct classes
-      original_na_counts <- sapply(colnames(new_data), 
-                                   function(col) sum(is.na(new_data[[col]]))) 
-      
-      new_data$ID <- as.character(new_data$ID)
-      new_data$Term_Description <- as.character(new_data$Term_Description)
-      new_data$non_Signif_Snw_Genes <- as.character(new_data$non_Signif_Snw_Genes)
-      new_data$Up_regulated <- as.character(new_data$Up_regulated)
-      new_data$Down_regulated <- as.character(new_data$Down_regulated)
-      new_data$all_pathway_genes <- as.character(new_data$all_pathway_genes)
-      new_data$Status <- as.character(new_data$Status)
-      new_data$Fold_Enrichment <- as.numeric(new_data$Fold_Enrichment)
-      new_data$occurrence <- as.numeric(new_data$occurrence)
-      new_data$support <- as.numeric(new_data$support)
-      new_data$lowest_p <- as.numeric(new_data$lowest_p)
-      new_data$highest_p <- as.numeric(new_data$highest_p)
-      new_data$num_genes_in_path <- as.numeric(new_data$num_genes_in_path)
-      new_data$Cluster <- as.numeric(new_data$Cluster)
-      
-      for(i in colnames(new_data)){
-        new_na <- sum(is.na(new_data[[i]]))
-        if(!new_na == original_na_counts[[i]]){
-          showErrorModal(paste0('Coercion of column ', i, ' to proper class introduced na values. ', i, ' requires numeric.'))
-          return()
-        }
-      }
-      
-      return(new_data)
-      
-    }
-  }
-  #returns (genes, abundance data)
-  readPathfinderNewAbundance <- function(fileDataPath){
-      
-    path <- fileDataPath
-    
-    if (!grepl('\\.(csv|tsv)$', path, ignore.case = TRUE)) {
-      showErrorModal('An unreadable file type was submitted (use csv or tsv)')
-      return()
-    }
-    
-    if (grepl('\\.tsv$', path, ignore.case = TRUE)) {
-      new_abun <- read.csv(path, sep = "\t")
-    } else {
-      new_abun <- read.csv(path)
-    }
-    
-    
-    if('Gene_symbol' %in% colnames(new_abun)){
-      genes <- new_abun %>% select(Gene_symbol)
-    }else if('gene_name' %in% colnames(new_abun)){
-      genes <- new_abun %>% select(gene_name)
-    }else{
-      showErrorModal('there must be a column Gene_symbol or gene_name containing unique gene names')
-      return()
-    }
-    
-    samplecol <- grep("^\\.", colnames(new_abun), value = TRUE)
-    if(length(samplecol) < 2){
-      showErrorModal('Not enough samples found')
-      return()
-    }
-    
-    
-    data <- new_abun %>% 
-      select(all_of(samplecol), any_of(c("Gene_symbol", "gene_name"))) %>%
-      tibble::column_to_rownames(var = names(.)[ncol(.)]) %>%
-      select(all_of(samplecol))
-    
-    return(list(genes, data))
-      
-  }
+#----
   
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #~~~~~######____________Output $ Objects______________######~~~~~#
@@ -1044,57 +771,60 @@ server <- function(input, output) {
       includeHTML('www/DESeq2_Intro.HTML')
     })
     output$preRun_preview1 <- renderUI({
-    df <- raw_counts()
-    
-    if(!is.null(df)){
+      #SET LOCAL DF
+      df <- RCV.FILTERED_COUNTS()
       
-      #Some editing to display the gene names as well
-      df$gene_id <- row.names(df)
-      df <- left_join(df, gene_names()) %>% 
-        tibble::column_to_rownames('gene_id')
+      #SET DEFAULT CASE FOR NO UPLOAD
+      if(is.null(df)){
+        return(span("No Data Yet",style="color: red;"))
+      }
+      
+      #transfer gene names
+      df$gene_name <- rownames(df)
       
       #Organize columns
-      df <- data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
+      df <- df %>% select(gene_name, everything())
       
-      table <- renderDT({df}, rownames = FALSE, options = list(pageLength=7))
-    }else{
-      return()
-    }
-    
-    div(
-      h4('Uploaded Files'),
-      table
-    )
-    
-  })
+      table <- renderDT({df}, rownames = FALSE, options = list(pageLength=7, scrollX = TRUE))
+      
+      div(table)
+    })
     output$preRun_preview2 <- renderUI({
-    if(!is.null(metaData())){ renderTable({metaData()}, rownames  = TRUE) }
-    else{return()}
-  })
+      meta_data <- RCV.META_DATA()
+      
+      if(!is.null(meta_data)){ 
+        
+        renderTable({meta_data}, rownames  = TRUE) 
+        
+      }else{
+        
+        span("Upload a file",style="color: red;")
+        
+      }
+    })
   #----
   
   #TabSet 1
-  #______________________________Diff 1____________________________#----
+  #______________________________Diff 1_______DONE_________________#----
   
     # Raw Counts data table 
     output$raw_counts_PreviewTable <- renderUI({
         
-        df <- raw_counts()
+        #SET LOCAL DF
+        df <- RCV.FILTERED_COUNTS()
         
-        table <- renderUI({span("Upload a file",style="color: red;")})
-
-        if(!is.null(df)){
-          
-          #Some editing to display the gene names as well
-          df$gene_id <- row.names(df)
-          df <- left_join(df, gene_names()) %>% 
-                tibble::column_to_rownames('gene_id')
-          
-          #Organize columns
-          df <- data.frame(df[, c((ncol(df)), 1:(ncol(df)-1))])
-          
-          table <- renderDT({df}, rownames = FALSE, options = list(pageLength=7, scrollX = TRUE))
+        #SET DEFAULT CASE FOR NO UPLOAD
+        if(is.null(df)){
+          return(span("No Data Yet",style="color: red;"))
         }
+  
+        #transfer gene names
+        df$gene_name <- rownames(df)
+        
+        #Organize columns
+        df <- df %>% select(gene_name, everything())
+        
+        table <- renderDT({df}, rownames = FALSE, options = list(pageLength=7, scrollX = TRUE))
 
         div(table)
 
@@ -1102,52 +832,73 @@ server <- function(input, output) {
     
     # render table for metadata
     output$sample_conditions_PreviewTable <- renderUI({
-        if(!is.null(metaData())){ renderTable({metaData()}, rownames  = TRUE) }
-        else{span("Upload a file",style="color: red;")}
+      
+      meta_data <- RCV.META_DATA()
+      
+      if(!is.null(meta_data)){ 
+        
+        renderTable({meta_data}, rownames  = TRUE) 
+        
+      }else{
+        
+        span("Upload a file",style="color: red;")
+      
+      }
     })
+    
+    
     # A data table showing normalized counts
     output$normalized_counts_PreviewTable <- renderUI({
       
-      if(is.null(normalized_counts())){
+      #LOCALIZE
+      norm <- RCV.NORMALIZED_COUNTS()
+      
+      if(is.null(norm)){
         return(span("No Data Yet",style="color: red;"))
       }
       
-      normalized <- normalized_counts() %>% 
-        round(digits = 4) %>% 
-        mutate(gene_id = rownames(normalized_counts())) 
+      #ROUND AND TRANSFER NAMES
+      norm <- norm %>% round(digits = 4)
+      norm$gene_name <- rownames(norm)
       
-      pvals <- results_ddsc() %>% 
-        mutate(gene_id = rownames(results_ddsc())) %>%
-        left_join(gene_names()) %>% 
-        select(gene_name, padj)
+      #PULL PVALUES FROM RESULTS
+      res <- RCV.RESULTS_DDSC()
+      res$gene_name <- rownames(res)
+      pvals <- res %>% select(padj, gene_name)
       
-      normalized <- left_join(normalized, gene_names()) %>% 
-        select(-gene_id) 
+      #MERGE PVALUES TO NORMALIZED COUNTS
+      normalized <- left_join(norm, pvals)
+
+      #ORDER BY PVAL
+      normalized <- normalized %>% arrange(padj)
       
-      normalized <- left_join(normalized, pvals, 
-                              relationship="many-to-many") 
-      
-      normalized <- normalized[order(normalized$padj),c((ncol(normalized) - 1), ncol(normalized), 1:(ncol(normalized) - 2))]
-      
+      #REORDER COLS
+      normalized <- normalized %>% select(gene_name, padj, everything())
+
       renderDT({normalized}, rownames=FALSE, options = list(pageLength=7, scrollX = TRUE))
       
     })
     
 
-  #______________________________Diff 2____________________________#----
+  #______________________________Diff 2_______DONE_________________#----
     
     # 3 tables feature genes that fit in expression categories
     output$expression_tables <- renderUI({
 
-      if(is.null(results_ddsc()) || is.null(gene_names())){
+      #LOCALIZE VARIABLES
+      results <- RCV.RESULTS_DDSC()
+      
+      #ASSERT NEEDED OBJECTS
+      if( is.null(results) ){
         return(renderUI({span("No Data Yet",style="color: red;")}))
       }
       
+      
       #Splits the DEG list into groups by fold change 
-      func_return <- splitByExpr(results_ddsc(), gene_names(), input$cutOffs )
-      up <- data.frame(func_return[1]) #up regulated
-      down <- data.frame(func_return[2]) #downregulated
-      noR <- data.frame(func_return[3]) #Inbetween (no regulation)
+      func_return <- splitByExpr(results, input$cutOffs )
+      up <- as.data.frame(func_return[1]) #up regulated
+      down <- as.data.frame(func_return[2]) #downregulated
+      noR <- as.data.frame(func_return[3]) #Inbetween (no regulation)
 
       p <- as.numeric(input$pvaluePg2)
       
@@ -1183,49 +934,60 @@ server <- function(input, output) {
     
     # A simple histogram that shows the distribution of fold change
     output$Distribution_Histogram_ui <- renderUI({
-        if(is.null(results_ddsc())){
+      
+      #LOCALIZE VARIABLES
+      results <- RCV.RESULTS_DDSC()  
+      
+      #ASSERT NEEDED THINGS
+      if(is.null(results)){
           return()
-        }
+      }
         
-        plot <- renderPlot({
-          p <- as.numeric(input$pvaluePg2)
-          data <- results_ddsc() %>% 
-                              filter(padj < p) %>% 
-                              select('log2FoldChange')
-          ggplot(data, aes(x=log2FoldChange)) + 
-            geom_histogram(bins=50, fill='darkslategrey') + 
-            xlab("Log2 Fold Change") + 
-            ylab("") + 
-            theme_minimal() + 
-            theme(panel.grid.major.x = element_blank(), 
-                  panel.grid.minor.y = element_blank(),
-                  panel.grid.minor.x = element_blank(),
-                  panel.grid.major.y = element_blank(),
-                  axis.line.x = element_blank(),
-                  axis.line.y = element_blank(),
-                  plot.margin = margin(75, 15, 0, -5, "pt"),
-                  axis.text.x = element_text(color = "black", size = 15),
-                  axis.text.y = element_text(color = "black", size = 15),
-                  axis.title.x = element_text(size = 15)
-          ) 
-        })
-
-        div(
-          HTML("<h4>Distribution of Fold Change</h4>"),
-          plot
-        )
+      plot <- renderPlot({
         
+        p <- as.numeric(input$pvaluePg2)
+        
+        data <- results %>% 
+                    filter(padj < p) %>% 
+                    select('log2FoldChange')
+        
+        ggplot(data, aes(x=log2FoldChange)) + 
+          geom_histogram(bins=50, fill='darkslategrey') + 
+          xlab("Log2 Fold Change") + 
+          ylab("") + 
+          theme_minimal() + 
+          theme(panel.grid.major.x = element_blank(), 
+                panel.grid.minor.y = element_blank(),
+                panel.grid.minor.x = element_blank(),
+                panel.grid.major.y = element_blank(),
+                axis.line.x = element_blank(),
+                axis.line.y = element_blank(),
+                plot.margin = margin(75, 15, 0, -5, "pt"),
+                axis.text.x = element_text(color = "black", size = 15),
+                axis.text.y = element_text(color = "black", size = 15),
+                axis.title.x = element_text(size = 15)
+        ) 
       })
+
+      div(
+        HTML("<h4>Distribution of Fold Change</h4>"),
+        plot
+      )
+        
+    })
     
-  #______________________________Diff 4____________________________#----
+  #______________________________Diff 4_______DONE_________________#----
     
     # The principle component plot
     output$principle_components <- renderPlot({
       
-      if(is.null(vst_Obj())){return()}
+      #LOCALIZE VARIABLES
+      vst <- RCV.VST_OBJ()
+      
+      if(is.null(vst)){return()}
       if(length(input$pca_cond) == 0){return()}
       
-      pca_plot <- principlePlot(vst_Obj(), 
+      pca_plot <- principlePlot(vst, 
                                 input$pca_cond, 
                                 input$pca_nrow, 
                                 input$title_pca_plot, 
@@ -1235,30 +997,43 @@ server <- function(input, output) {
       pca_plot
       
     })
+    
     # UI holding the plot
     output$principle_component_plots_ui <- renderUI({
       
-      if(is.null(vst_Obj()) || length(input$pca_cond) == 0){
+      #LOCALIZE VARiABLES
+      vst <- RCV.VST_OBJ()
+      
+      if(is.null(vst) || length(input$pca_cond) == 0){
         return(span("No Data Yet, Or No Selected Factors",style="color: red;"))
       }
 
       plotOutput('principle_components', height= "700px", width = "100%")
     
     })
-    # Widget for changing genes using in plot
+    
+    # Widget for changing genes used in plot
     output$pca_n_counts <- renderUI({
       
+      #LOCALIZE VARIABLES
+      counts <- RCV.VST_COUNTS()
+      
       #Sets the number of genes to 500, or the maximum
-      if(is.null(vst_counts())){
+      if(is.null(counts)){
+        
         m <- 500
         start <- 500
+        
       }else{
-        m <- nrow(vst_counts())
-        if(nrow(vst_counts()) >= 500){
-          start <- 500
-        }else(
+        
+        m <- nrow(counts)
+        
+        if(nrow(counts) <= 500){
           start <- m
-        )
+        }else{
+          start <- 500
+        }
+        
       }
       
       div(
@@ -1270,37 +1045,53 @@ server <- function(input, output) {
                     value=start, min=2, max=m)
       )
     })
+    
     #Widget for changing the metadata columns
     output$pca_metadata <- renderUI({
+      
+      #LOCALIZE VARIABLES
+      meta_data <- RCV.META_DATA()
+      
       div(
         checkboxGroupInput('pca_cond', 'Meta data conditions to view', 
-                        choices=colnames(metaData()),
-                        selected=colnames(metaData()),
+                        choices=colnames(meta_data),
+                        selected=colnames(meta_data),
                         inline=FALSE)
       )
     })
     
-  #______________________________Diff 5____________________________#----
+  #______________________________Diff 5_______DONE_________________#----
     
     # The heatmap for correlation analysis
     output$heatmap_plot1 <- renderPlot({
-      if(is.null(vst_counts())){return()}
+      
+      #LOCALIZE VARIABLES
+      counts <- RCV.VST_COUNTS()
+      meta_data <- RCV.META_DATA()
+      
+      #ASSERT NEEDED VARIABLES
+      if(is.null(counts)){return()}
         
-      #Correlation Matrix
-      vst_cor <- cor(vst_counts())
+      #         CREATE CORRELATION MATRIX
+      # ___________________________________________
+      vst_cor <- cor(counts)
       
-      #Annotations
-      to_annotate <- intersect(colnames(metaData()), input$heatmap_cond)
+      #   CREATE LIST OF CONDITIONS TO ANNOTATE
+      #____________________________________________
+      to_annotate <- intersect(colnames(meta_data), input$heatmap_cond)
       
+      #CREATE ANNOTATION ELEMENTS
       annotations <- lapply(to_annotate, function(an) {
         
+        #CREATE RAMP PALLETS
         selected_color <- colorRampPalette(c(input[[paste0("color1_", an)]], 
                                               input[[paste0("color2_", an)]])
-                                          )(nlevels(factor(metaData()[[an]])))
-      
-        selected_color <- setNames(selected_color, levels(factor(metaData()[[an]])))
-          
-        HeatmapAnnotation(df = metaData()[, an, drop = FALSE], 
+                                          )(nlevels(factor(meta_data[[an]])))
+        
+        selected_color <- setNames(selected_color, levels(factor(meta_data[[an]])))
+        
+        #CREATE HEATMAP ANNOTATION ELEMENT
+        HeatmapAnnotation(df = meta_data[, an, drop = FALSE], 
                           which = "col", 
                           annotation_name_side = "left",
                           annotation_name_gp = gpar(fontsize = 17, color='black'),
@@ -1310,20 +1101,21 @@ server <- function(input, output) {
                           show_legend = FALSE
                           )
       })
-      combined_annotations <- do.call(c, annotations)
       
-
-      #Legends for Annotations
+      #COMBINE ELEMENTS
+      combined_annotations <- do.call(c, annotations)
+  
+      #CREATE LEGENDS FOR ANNOTATIONS
       legends <- lapply(to_annotate, function(an) {
         
         selected_color <- colorRampPalette(c(input[[paste0("color1_", an)]], 
                                             input[[paste0("color2_", an)]])
-                                          )(nlevels(factor(metaData()[[an]])))
+                                          )(nlevels(factor(meta_data[[an]])))
         
-        selected_color <- setNames(selected_color, levels(factor(metaData()[[an]])))
+        selected_color <- setNames(selected_color, levels(factor(meta_data[[an]])))
         
-        Legend(at = levels(factor(metaData()[[an]])),
-              labels = levels(factor(metaData()[[an]])),
+        Legend(at = levels(factor(meta_data[[an]])),
+              labels = levels(factor(meta_data[[an]])),
               legend_gp = gpar(fill = selected_color),
               title = an,
               title_gp = gpar(fontsize = 17,  col = 'black'),
@@ -1333,7 +1125,11 @@ server <- function(input, output) {
               grid_width = unit(1, "cm"),
               grid_height = unit(0.5,"cm")
         )
+        
       })
+      
+      #                   COLOR SCHEMES
+      #___________________________________________________
       
       #Colors Body default case
       col_fun <- colorRamp2(c(0.92,1), c('white','black'))
@@ -1346,7 +1142,6 @@ server <- function(input, output) {
                     labels_gp = gpar(fontsize = 17, col = 'black'), legend_height = unit(6, "cm"), grid_width= unit(1,"cm"),
                     title_gap = unit(0.40, "cm"))
       }
-      
       else if(input$heat_body_color == "REV-Rainbow"){
         
         col_fun <- colorRamp2(c(0.86, 0.90, 0.925, 0.935, 0.945, 0.955, 0.965, 0.975, 0.98, 0.985, 0.99, 0.995, 1), rev(rainbow(13)))
@@ -1356,7 +1151,6 @@ server <- function(input, output) {
                     title_gap = unit(0.4, "cm"))
         
       }
-      
       else if(input$heat_body_color == "white-black"){
         breaks <- c(0.94, 0.96, 0.975, 0.980,0.990,0.995, 1)
         colors <- c('white','lightgrey','grey50','ivory4','lavenderblush4', 'grey25', 'black')
@@ -1366,9 +1160,8 @@ server <- function(input, output) {
                     title_gap = unit(0.40, "cm"))
       }
       
-      x <- Heatmap(vst_cor,
-              name = "Value",
-              col=col_fun,
+      
+      x <- Heatmap(vst_cor,   name = "Value",  col=col_fun,
 
               top_annotation = combined_annotations,
               
@@ -1380,7 +1173,6 @@ server <- function(input, output) {
               column_dend_gp = gpar(color='black', lwd = 2.25),
               row_dend_width = unit(1.5, 'cm'),
               column_dend_height = unit(1.5, 'cm'),
-              
               
               show_row_names = TRUE,
               row_names_side = "left",
@@ -1398,16 +1190,19 @@ server <- function(input, output) {
               rect_gp = gpar(col = "black", lwd = 1),
               
               show_heatmap_legend = FALSE
-            
       )
 
-      #draw body
+      #           DRAW PLOT
+      #______________________________________________________
       draw(x, padding = unit(c(0.1, 0.03, 0.15, 0.35), "npc"))
       
-      #Draw body legend
-      draw(l, x= unit(0.85, "npc"), y = unit(0.5, "npc"), just = c("center", "right"))
+      #           DRAW BODY LEGEND
+      #_______________________________________________________
+      draw(l, x= unit(0.85, "npc"), y = unit(0.5, "npc"), 
+           just = c("center", "right"))
       
-      #pack and draw annotation legends
+      #         PACK AND DRAW ANNOTATION LEGENDS
+      #______________________________________________________
       legends <- packLegend(legends, direction = "vertical")
       for (i in seq_along(legends)) {
         draw(legends[[i]], x = unit(0.90, "npc"), y = unit(0.85 - i * 0.05, "npc"), just = c("right", "top"))
@@ -1421,25 +1216,49 @@ server <- function(input, output) {
       grid.text(input$caption_heatmap_plot, x = unit(0.5, "npc"), y = unit(0.05, "npc"), just = c("center", "bottom"), gp = gpar(fontsize = 15, fontface = "italic"))
       
     })
-    # The ui to display the heatmap plot
-    output$heatmap_plots_ui <- renderUI({
-      
-      if(is.null(vst_counts())){
-        return(span("No Data Yet",style="color: red;"))
-      }  
-      fluidPage(
-          plotOutput('heatmap_plot1', height= "900px" ,width = "100%")
-      )
-    })
-    # UI for selecting annotations
+    
+     # UI for selecting annotations
     output$heatmap_annotations <- renderUI({
+      
+      #LOCALIZE VARIABLES
+      meta_data <- RCV.META_DATA()
+      
+      if(is.null(meta_data)){
+        return()
+      }
+      
       div(
         checkboxGroupInput('heatmap_cond', 'Meta data conditions to view', 
-                          choices=colnames(metaData()),
-                          selected=colnames(metaData()),
+                          choices=colnames(meta_data),
+                          selected=colnames(meta_data),
                           inline=FALSE)
       )
     })
+    
+    # The ui to display the heatmap plot
+    output$heatmap_plots_ui <- renderUI({
+      
+      #LOCALIZE VARIABLES
+      counts <- RCV.VST_COUNTS()
+      
+      if(is.null(counts)){
+        return(span("No Data Yet",style="color: red;"))
+      }  
+      
+      if( (ncol(counts) * 45) > 800){
+        h <- ncol(counts) * 45 + 200
+      }else{
+        h <- 800
+      }
+      
+      h <- paste0(h, "px")
+     
+      fluidPage(
+        plotOutput('heatmap_plot1', height= h,width = "100%")
+      )
+      
+    })
+    
     # displays the correct color editors for the selected annotations
     observe({
       
@@ -1459,39 +1278,44 @@ server <- function(input, output) {
       })
     })
   
-  #______________________________Diff 6____________________________#----
+  #______________________________Diff 6_______DONE_________________#----
     
     # A ui bar on the left displaying some important genes 
     output$leftbar_gene_plots <- renderUI({
       
-      if(is.null(results_ddsc()) || is.null(normalized_counts())){
-        return()
-      }
+      #LOCALIZE VARIABLES
+      results <- RCV.RESULTS_DDSC()
+      norm <- RCV.NORMALIZED_COUNTS()
+      meta_data <- RCV.META_DATA()
+      
+      #ASSERT NEEDED VARIABLES
+      if(is.null(results) || is.null(norm)){ return() }
 
       p <- as.numeric(input$pvaluePg6)
       
-      counts <- data.frame(round(normalized_counts())) %>%
-                            mutate(gene_id = rownames(normalized_counts()))
+      #SETUP COUNTS
+      counts <- round(norm) 
+      counts$gene_name <- rownames(counts)
       
-      counts <- left_join(counts, gene_names()) 
-      counts <- left_join(counts, (results_ddsc() %>%
-                                     mutate(gene_id = rownames(results_ddsc())) %>%
-                                     select(padj, log2FoldChange, gene_id))
-                          ) %>% filter(padj <= p)
+      #SETUP RESULTS
+      results$gene_name <- rownames(results)
+      results <- results %>% select(gene_name, padj, log2FoldChange)
       
-      info_col <- c('gene_id', 'gene_name', 'padj', 'log2FoldChange')
-      counts_col <- counts %>% select(-all_of(info_col))
-      counts <- counts[c(info_col, colnames(counts_col))]
+      #MERGE COUNTS AND RESULTS
+      data <- left_join(results, counts)
       
-      tp <- counts[order(counts$padj),] %>% head(1)
-      lf <- counts[order(-counts$log2FoldChange),] %>% head(1)
-      hf <- counts[order(counts$log2FoldChange),] %>% head(1)
+      #FILTER PVALUES
+      data <- data %>% filter(padj <= p)
+    
+      tp <- data %>% arrange(padj) %>% head(1)
+      lf <- data %>% arrange(log2FoldChange) %>% head(1)
+      hf <- data %>% arrange(desc(log2FoldChange)) %>% head(1)
       
-      top_pval <- gplop(tp, metaData(), colnames(metaData()))
+      top_pval <- gplop(tp, meta_data, colnames(meta_data))
       
-      low_fold <- gplop(lf, metaData(), colnames(metaData()))
+      low_fold <- gplop(lf, meta_data, colnames(meta_data))
       
-      high_fold <- gplop(hf, metaData(), colnames(metaData()))
+      high_fold <- gplop(hf, meta_data, colnames(meta_data))
       
       div(
         
@@ -1510,17 +1334,19 @@ server <- function(input, output) {
       )
 
     })
+    
     # A ui bar on the right displaying a datatable of all the genes
     output$gene_name_list <- renderUI({
       
-      if(is.null(gene_names())){
-
+      #LOCALIZE VARIABLE
+      names <- RCV.GENE_NAMES()
+      
+      if(is.null(names)){
         span("No Data Yet",style="color: red;")
         return()
       }
 
-      names <- datatable(gene_names() %>% 
-                        select('gene_name'),
+      names <- datatable(names,
                         rownames=FALSE, 
                         option=list(pageLength=25))
       div(
@@ -1529,93 +1355,120 @@ server <- function(input, output) {
       )
 
     })
+    
     # A ui for displaying the search method 
     output$gene_count_search <- renderUI({
       
-      if(is.null(results_ddsc()) || is.null(normalized_counts())){
+      #LOCALIZE VARIABLES
+      results <- RCV.RESULTS_DDSC()
+      norm <- RCV.NORMALIZED_COUNTS()
+      meta_data <- RCV.META_DATA()
+      
+      if(is.null(results) || is.null(norm)){
         return(span("No Data Yet",style="color: red;"))
       }
       
-      counts <- data.frame(round(normalized_counts())) %>%
-        mutate(gene_id = rownames(normalized_counts()))
+      #SETUP COUNTS
+      counts <- data.frame(round(norm)) 
+      counts$gene_name <- rownames(counts) %>% tolower()
       
-      counts <- left_join(counts, gene_names()) 
-      counts <- left_join(counts, (results_ddsc() %>%
-                                     mutate(gene_id = rownames(results_ddsc())) %>%
-                                     select(padj, log2FoldChange, gene_id))
-      )
+      #SETUP RESULTS
+      results$gene_name <- rownames(results) %>% tolower()
+      results <- results %>% select(gene_name, padj, log2FoldChange)
       
-      #sort df 
-      info_col <- c('gene_id', 'gene_name', 'padj', 'log2FoldChange')
-      counts_col <- counts %>% select(-all_of(info_col))
-      counts <- counts[c(info_col, colnames(counts_col))]
+      #MERGE COUNTS AND RESULTS
+      data <- left_join(results, counts)
       
       div(
         
-        textInput("gene_count_plot_search",
+        textInput("gplop_searched",
                   "Search and plot a gene", 
                   NULL),
         
         checkboxGroupInput('gene_count_plot_search_cond', 
                             'Meta data conditions to view, first 4 are considered with mapping order (x, color, shape, size)', 
-                            choices=colnames(metaData()),
-                            selected=colnames(metaData()),
+                            choices=colnames(meta_data),
+                            selected=colnames(meta_data),
                             inline=TRUE),
         renderUI({
           
-          if(!is.null(input$gene_count_plot_search)){
-            gene <- counts %>% filter(gene_name == input$gene_count_plot_search)
+          if(!is.null(input$gplop_searched)){
             
-            if(is.null(gene) || ncol(gene) == 0 || nrow(gene) == 0){
+            #EDIT SEARCH
+            g <- input$gplop_searched %>% tolower()
+            
+            #PULL SEARCH
+            res <- data %>% filter(gene_name == g)
+            print(res)
+            
+            #ASSERT SINGLE ROW
+            if(is.null(res) || ncol(res) == 0 || nrow(res) == 0){
               return()
             }
-            if(nrow(gene) > 1 ){
-              gene <- gene[1,]
+            if(nrow(res) > 1 ){
+              res <- res[1,]
             }
             
-            x <- gplop(gene, metaData(), input$gene_count_plot_search_cond)
+            x <- gplop(res, meta_data, input$gene_count_plot_search_cond)
             renderPlot({x})
             
           }else{
             p("Nothing Here Yet")
           }
+          
         })
 
       )
     })
     
-  #______________________________Diff 7____________________________#----
+  #______________________________Diff 7_______DONE_________________#----
   
     # The plot for the volcano plot page
     output$volcano_plot <- renderPlot({
       
-      if(is.null(results_ddsc())){ return() }
+      #LOCALIZE VARIABLES
+      results <- RCV.RESULTS_DDSC()
       
+      #             REQUIRE RESULTS
+      #____________________________________
+      if(is.null(results)){ return() }
+      
+      #         HANDLE GENE SEARCHING
+      #____________________________________
       if(!is.null(input$volc_search)){
         search <- strsplit(input$volc_search, ",")[[1]]
-        search <- trimws(search)
+        search <- tolower(trimws(search))
       }else{
         search <- NULL
       }
       
-      deg <- results_ddsc() %>% 
-        mutate(gene_id = rownames(results_ddsc()))
+      #         MODIFY RESULTS DF
+      #________________________________________
+      results$gene_name <- rownames(results)
+      results <- results %>% select(gene_name,log2FoldChange, padj)
+      #Pvalue adjustment
+      results$padj <- as.numeric(results$padj) 
       
-      deg <- left_join(deg, gene_names()) %>% 
-        select(gene_name, log2FoldChange, padj)
-      
-      deg$padj <- as.numeric(deg$padj) 
-      
+      #         LOCALIZE PLOT PARAMETERS
+      #_______________________________________
+      #down regulation cut off
       lowcut <- input$volcano_cutoffs[1]
-      highcut <- input$volcano_cutoffs[2] 
+      #down regulation cut off
+      highcut <- input$volcano_cutoffs[2]
+      #Pvalue cuttoff
       pcut <- input$pvaluePg7 
+      #scatter population
       pop_score <- input$volcano_pop 
+      #Label density
       lab_score <- input$volcano_lab_density 
+      
+      #labs
       title <- input$title_volc_plot 
       subtitle <- input$subtitle_volc_plot 
       caption <- input$caption_volc_plot
       
-      plot <- erupt( deg, 
+      #PLOT
+      plot <- erupt( results, 
                      lowcut, 
                      highcut, 
                      pcut, 
@@ -1631,7 +1484,11 @@ server <- function(input, output) {
     })
     # A ui for displaying the volcano plot
     output$volcano_plot_ui <- renderUI({
-      if(is.null(results_ddsc())){
+      
+      #LOCALIZE VARIABLES
+      results <- RCV.RESULTS_DDSC()
+      
+      if(is.null(results)){
         return(span("No Data Yet",style="color: red;"))
       }
       
@@ -1648,134 +1505,184 @@ server <- function(input, output) {
   #----  
   
   #Tabset 2
-  #______________________________Path 1____________________________#----
+  #______________________________Path 1_______DONE_________________#----
     
     output$pathfinderPreview <- renderUI({
       
-      if( is.null(pathfinder_results()) ){
-        return()
-      }
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
       
-      data <- pathfinder_results() %>% select(-ID, -Up_regulated,	-Down_regulated, -all_pathway_genes)
+      if( is.null(res) ){ return() }
+      
+      #ORGANIZE
+      data <- res %>% 
+        select(-ID, -Up_regulated,	-Down_regulated, -all_pathway_genes)
+      
       renderDT({data}, rownames = FALSE)
       
     })
   
-  #______________________________Path 2____________________________#----
-    enrichment_plot_height_px <- reactiveVal(450)
+  #______________________________Path 2_______DONE_________________#----
     
-    output$enrichmentChart <- renderPlot({
+    output$enrichmentUI <- renderUI({
       
-      if( input$enrichment_genes != c("")){
-        search_genes <- strsplit(input$enrichment_genes, ",")[[1]]
-        search_genes <- trimws(search_genes)
-      }else{
-        search_genes <- NULL
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
+      
+      #         REQUIRE RESULTS
+      #_______________________________
+      if(is.null(res)){
+        return(span("No Data Yet",style="color: red;"))
       }
 
-      if( input$enrichment_paths != c("") ){
+      #       HANDLE SEARCHES
+      #_____________________________
+      
+      #GENES
+      if( input$enrichment_genes != c("")){
+        
+        search_genes <- strsplit(input$enrichment_genes, ",")[[1]]
+        search_genes <- trimws(search_genes)
+      
+      } else { search_genes <- NULL }
+      
+      #PATHWAYS
+      if( input$enrichment_paths != c("")){
+        
         search_paths <- strsplit(input$enrichment_paths, ",")[[1]]
         search_paths <- trimws(search_paths)
-      }else{
-        search_paths <- NULL
-      }
+        
+      } else { search_paths <- NULL }
       
-      if( input$enrichment_clusters != c("") ){
+      #CLUSTERS
+      if( input$enrichment_clusters != c("")){
+        
         search_clusters <- strsplit(input$enrichment_clusters, ",")[[1]]
         search_clusters <- as.numeric(trimws(search_clusters))
         
-      }else if( is.null(search_genes) && is.null(search_paths) ){
+      }
+      #DEFAULT DISPLAY CLUSTERS
+      else if( is.null(search_genes) && is.null(search_paths) ){
         
         search_clusters <- seq(1, input$clusters_on_enrichment)
         
-      }else{
-        search_clusters <- NULL
       }
+      else{ search_clusters <- NULL }
       
-      plot <- enricher(pathfinder_results(), 
+      #           PLOT
+      #_____________________________
+      chart <- enricher(res, 
                        search_clusters,
                        search_genes,
                        search_paths) 
       
-      plot <- plot +
+      #         EDIT PLOT
+      #_____________________________
+      chart <- chart +
         theme(axis.text.y = element_text(size = 17),
               axis.text.x = element_text(size = 15),
               legend.text = element_text(size = 15),
               legend.title = element_text(size = 15),
               strip.text = element_text(size = 15))
       
-      hits <- plot$data
-      enrichment_plot_height_px(paste0(450 + nrow(hits) * 23, "px"))
-      plot
+      #         DYNAMIC SIZING
+      #________________________________
+      hits <- nrow(chart$data)
+      h <- paste0(450 + hits * 23, "px")
+      w <- "1000px"
       
-    })
-    
-    output$enrichmentUI <- renderUI({
       
-      if(is.null(pathfinder_results())){
-        return(span("No Data Yet",style="color: red;"))
-      }
+      #           RENDER PLOT
+      #________________________________
+      output$enrichmentChart <- renderPlot({ chart })
       
-      plotOutput('enrichmentChart', height = enrichment_plot_height_px() )
+      
+      #           CREATE UI
+      #________________________________
+      div( plotOutput('enrichmentChart', height = h, width = w) )
       
     })
     
     output$enrichment_clusters_shown <- renderUI({
 
-      if( is.null(pathfinder_results()) ){
-        return()
-      }
-      if( input$enrichment_genes == "" && input$enrichment_paths == "" && input$enrichment_clusters == "" ){
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
+      
+      #           REQUIRE RESULTS
+      # ___________________________________
+      if( is.null(res) ){ return() }
+      
+      #MAKE SLIDER UI
+      if( input$enrichment_genes == "" && 
+          input$enrichment_paths == "" && 
+          input$enrichment_clusters == "" ){
 
         sliderInput('clusters_on_enrichment', 
                     "# Clusters Shown", 
                     min = 1, 
-                    max = as.numeric(max(pathfinder_results()$Cluster)),
-                    value = round(1 + (0.15 * max(pathfinder_results()$Cluster))))
+                    max = as.numeric(max(res$Cluster)),
+                    value = round(1 + (0.15 * max(res$Cluster))))
       }
+      
     })
     
     output$pathwaysDT9 <- renderUI({
-      if( is.null(pathfinder_results()) ){
-        return()
-      }
       
-      data <- pathfinder_results() %>% select(Term_Description)
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
+      
+      #     REQUIRE RESULTS
+      #__________________________
+      if( is.null(res) ){ return() }
+      
+      data <- res %>% 
+        select(Term_Description)
+      
       renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
+      
     })
     
     output$genes_in_paths_DT9 <- renderUI({
-      if( is.null(pathfinder_results()) ){
-        return()
-      }
       
-      data <- pathfinder_results() %>%
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
+      
+      #       REQUIRE RESULTS
+      #____________________________
+      if( is.null(res)){ return() }
+      
+      #       CREATE A LIST OF ALL GENEs
+      #_____________________________________
+      data <- res %>%
         mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
         select(gene_list)
       
       dataDF <- c()
       
-      
       for(i in 1:nrow(data) ){
         dataDF <- c(dataDF, unlist(data[i,1]))
       }
+    
+      data <- data.frame(gene = dataDF)
       
-      
-      data <- data.frame(genes = dataDF)
-      
+      #MAKE COLUMN FOR HOW MANY PATHS EACH GENE IS IN
+      #_______________________________________________
       data <- data %>% 
-        group_by(genes) %>%
+        group_by(gene) %>%
         mutate(in_n_pathways = n()) %>% 
-        distinct(genes, .keep_all = TRUE) %>%
+        distinct(gene, .keep_all = TRUE) %>%
         arrange(desc(in_n_pathways))
       
+      #RENDER DATA TABLE
       renderDT({data}, rownames = FALSE, options = list(pageLength = 7))
       
     })
     
-  #______________________________Path 3____________________________#----
+  #______________________________Path 3_______DONE_________________#----
   
     plot10 <- reactiveVal(NULL)
+    
+    #HIDE SEARCH BY PATH
     observeEvent(input$pathway_heatmap_genes,{
       if(nchar(input$pathway_heatmap_genes) > 0){
         shinyjs::hide('heatmap_paths')
@@ -1783,6 +1690,7 @@ server <- function(input, output) {
         shinyjs::show('heatmap_paths')
       }
     })
+    #HIDE SEARCH BY GENE
     observeEvent(input$heatmap_paths,{
       if(nchar(input$heatmap_paths) > 0){
         shinyjs::hide('pathway_heatmap_genes')
@@ -1790,7 +1698,9 @@ server <- function(input, output) {
         shinyjs::show('pathway_heatmap_genes')
       }
     })
-    observeEvent(input$open_in_new_tab10, {
+    
+    #OPEN PLOTLY IN NEW TAB
+    observeEvent(input$open_in_new_tab10,{
       
       saveWidget(plot10(), 'plot.html')
       browseURL('plot.html')
@@ -1799,94 +1709,135 @@ server <- function(input, output) {
     
     output$open_in_new_tab10 <- renderUI({
       
-      if(is.null(pathfinder_results())){
-        return()
-      }
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
       
+      #REQUIRE RESULTS
+      if(is.null(res)){ return() }
+      
+      #BUTTON
       actionButton('open_in_new_tab10', 
                    "Open in new tab")    
     })
     
-    output$pathwaysDT10 <- renderUI({
-      if( is.null(pathfinder_results()) ){
-        return()
-      }
-      
-      data <- pathfinder_results() %>% select(Term_Description)
-      renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
-    })
     
-    output$genes_in_paths_DT10 <- renderUI({
-      if( is.null(pathfinder_results()) ){
-        return()
-      }
+    #DATA TABLE OF PATHWAYS
+    output$pathwaysDT10 <- renderUI({
       
-      data <- pathfinder_results() %>%
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
+      
+      #     REQUIRE RESULTS
+      #__________________________
+      if( is.null(res) ){ return() }
+      
+      data <- res %>% 
+        select(Term_Description)
+      
+      renderDT({data}, rownames = FALSE, options = list(pageLength = 5))
+      
+    })
+    #DATA TABLE OF GENES
+    output$genes_in_paths_DT10 <- renderUI({
+      
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
+      
+      #       REQUIRE RESULTS
+      #____________________________
+      if( is.null(res)){ return() }
+      
+      #       CREATE A LIST OF ALL GENEs
+      #_____________________________________
+      data <- res %>%
         mutate(gene_list = lapply(all_pathway_genes, function(x) trimws(unlist(strsplit(x, ","))))) %>%
         select(gene_list)
       
       dataDF <- c()
       
-      
       for(i in 1:nrow(data) ){
         dataDF <- c(dataDF, unlist(data[i,1]))
       }
       
+      data <- data.frame(gene = dataDF)
       
-      data <- data.frame(genes = dataDF)
-      
+      #MAKE COLUMN FOR HOW MANY PATHS EACH GENE IS IN
+      #_______________________________________________
       data <- data %>% 
-        group_by(genes) %>%
+        group_by(gene) %>%
         mutate(in_n_pathways = n()) %>% 
-        distinct(genes, .keep_all = TRUE) %>%
+        distinct(gene, .keep_all = TRUE) %>%
         arrange(desc(in_n_pathways))
       
+      #RENDER DATA TABLE
       renderDT({data}, rownames = FALSE, options = list(pageLength = 7))
       
     })
     
+    #PLOT UI
     output$pathway_heatmap <- renderUI({
       
-      if(is.null(pathfinder_results())){
-        return(span("No Data Yet",style="color: red;"))
-      }
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
       
+      #     REQUIRE RESULTS
+      #______________________________
+      if(is.null(res)){ return(span("No Data Yet",style="color: red;")) }
+      
+      #     SET UP PARAMETERS
+      #_______________________________
+      #GENES
       genes <- as.character(input$pathway_heatmap_genes)
-      pathways <- input$heatmap_paths
-      plot <- NULL
-      
       if(nchar(genes) > 0){
         genes <- strsplit(genes, ",")[[1]]
         genes <- trimws(genes)
-        plot <- geneheatmap(pathfinder_results(), genes)
-      }
-      else if(nchar(pathways) > 0){
-        
+      } else {genes <- NULL}
+      
+      #PATHWAYS
+      pathways <- input$heatmap_paths
+      if(nchar(pathways) > 0){
         if(grepl("^[1-9][0-9]*$", pathways)){
           pathways <- as.numeric(pathways)
         }else{
           pathways <- strsplit(pathways, ",")[[1]]
           pathways <- trimws(pathways)
         }
-        
-        plot <- pathwayheatmap(pathfinder_results(), pathways)
-        
+      } else {pathways <- NULL}
+      
+      #DEAFULT CASE
+      plot <- NULL
+      
+      
+      #   CREATE PLOT BASED ON SEARCH
+      #__________________________________
+      if(!is.null(genes)){
+        plot <- geneheatmap(res, genes)
       }
+      
+      else if(!is.null(pathways)){
+        plot <- pathwayheatmap(res, pathways)
+      }
+      
       else{
-        plot <- pathwayheatmap(pathfinder_results(), 5)
+        plot <- pathwayheatmap(res, 5)
       }
-     
+      
+      #   ASSERT PLOT EXISTS
+      #___________________________________
       if(is.null(plot)){
         plot10(NULL)
         return(span("No searched genes show diffrential expression",style="color: red;"))
       }
       
+      #THE PLOTLY OBJECT THAT CAN BE OPENED IN BROWSER
       plotlie <- plot[[2]]
+      #Edit dims
       plotlie$x$layout$width <- plotlie$x$layout$width + 200
       plotlie$x$layout$height <- plotlie$x$layout$height + 200
       plot10(plotlie)
       
-      output$plot <- renderPlot({
+      #CREATE PLOT OUTPUT
+      output$plot_heatmap_10 <- renderPlot({
         plot[[1]] +
           theme(
             axis.text.y = element_text(size = 15),
@@ -1897,181 +1848,209 @@ server <- function(input, output) {
           scale_x_discrete(position = 'top')
       }) 
       
-      plotOutput('plot', 
+      #UI OUTPUT
+      plotOutput('plot_heatmap_10', 
                  width = paste0(plot[[2]]$x$layout$width + 200, "px"), 
                  height = paste0(plot[[2]]$x$layout$height + 275, "px"))
       
       
     })
     
-  #______________________________Path 4____________________________#----
+  #______________________________Path 4_______DONE_________________#----
   
-    page11_height <- reactiveVal(500)
-    page11_width <- reactiveVal(500)
-    
     output$sample_conditions_PreviewTable11 <- renderUI({
-      if(!is.null(pathfinder_metaData())){ renderTable({pathfinder_metaData()}, rownames  = TRUE) }
-      else{span("Upload Meta Data",style="color: red;")}
+      
+      #LOCALIZE VARIABLES
+      meta_data <- RCV.PATHWAY_META_DATA()
+      
+      #REQUIRE DATA
+      if(is.null(meta_data)){ 
+        return(span("Upload Meta Data",style="color: red;"))
+      }
+      
+      #RENDER TABLE
+      
+      renderTable({meta_data}, rownames  = TRUE) 
+      
+
     })
     
     output$cases_select_box <- renderUI({
       
-      caseoptions <- rownames(pathfinder_metaData())
+      #LOCALIZE VARIABLES
+      meta_data <- RCV.PATHWAY_META_DATA()
+      
+      #REQUIRE DATA
+      if(is.null(meta_data)){ 
+        return(span("Upload Meta Data",style="color: red;"))
+      }
+      
+      caseoptions <- rownames(meta_data)
       
       checkboxGroupInput('score_terms_cases', 'Select Case Samples', 
                          choices = caseoptions, inline = TRUE)
       
     })
     
-    output$case_map_plot <- renderPlot({
-
-      if(is.null(pathfinder_results())){
-        return()
-      }
-
-      if(is.null(pathfinder_metaData())){
-        return()
-      }
-      
-      if(is.null(input$score_terms_cases)){
-        caseSamples <- NULL
-      }else(
-        caseSamples <- input$score_terms_cases
-      )
-      
-      if(!is.null(pathfinder_abundance_data())){
-        ab <- pathfinder_abundance_data()
-      }else if(!is.null(normalized_counts())){
-        ab <- normalized_counts()
-        ab$gene_id <- rownames(ab)
-        ab <- ab %>% left_join(gene_names())
-        ab <- ab %>% mutate(Gene_symbol = gene_name) %>%
-          select(-gene_id, -gene_name)
-      }else{
-        return()
-      }
-      
-      plotdata <- score_pathway_terms(
-                                   data = pathfinder_results(),
-                                   abundance = ab,
-                                   cases = caseSamples,
-                                   repOnly = input$repOnly, 
-                                   pathways = NULL)
-      
-      page11_height(plotdata[[2]])
-      page11_width(plotdata[[3]])
-
-      plot <- plotdata[[1]]
-      
-      plot
-      
-    })
-
     output$case_plot_ui <- renderUI({
-      if(is.null(pathfinder_abundance_data()) && is.null(normalized_counts())){
-        span("Abundance or counts data is needed for this visual",style="color: red;")
-      }else{
-        plotOutput('case_map_plot', height = page11_height(), width = page11_width())
-      }
-    })
-    
-    
-  #______________________________Path 5____________________________#----
 
-    sin_path_plot_h <- reactiveVal(600)
-    sin_path_plot_w <- reactiveVal(600)
-    
-    output$Single_pathway_plot <- renderPlot({
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
+      md <- RCV.PATHWAY_META_DATA()
+      norm <- RCV.NORMALIZED_COUNTS()
+      p.ab <- RCV.PATHWAY_ABUNDANCE()
       
-      if(is.null(pathfinder_results())){
-        return()
-      }
+      #     REQUIRE DATA
+      #_______________________
       
-      if(!is.null(pathfinder_abundance_data())){
-        
-        b <- pathfinder_abundance_data()
-        
-        b_name <- b %>% mutate(gene_name = Gene_symbol) %>%
-          select(-Gene_symbol)
-        
-        ab <- b_name
-        
-      }else if(!is.null(normalized_counts())){
-        
-        b <- normalized_counts()
-        
-        b$gene_id <- rownames(b)
-        
-        b_name <- b %>% left_join(gene_names()) %>% select(-gene_id)
-        
-        ab <- b_name
-                
-      }else{
-        
-        return()
-      
-      }
-      
-      ab$gene_name <- tolower(ab$gene_name)
-      
-      if(!is.null(results_ddsc())){
-        #set up deg
-        d <- results_ddsc()
-        d$gene_id <- rownames(d)
-        d_named <- d %>% left_join(gene_names()) %>% select(-gene_id)
-        d_named$gene_name <- tolower(d_named$gene_name)
-        
-        #merge deg and abundance
-        
-        DEG_ARGS <- d_named %>% left_join(ab)
-      }else{
-        ab$padj <- 0
-        
-        DEG_ARGS <- ab
-        
-      }
-      
-      data <- single_pathway_heatmap(input$Single_pathway_plot_search, 
-                                     DEG_ARGS, 
-                                     pathfinder_results(), 
-                                     genes_listed = input$Single_pathway_plot_num_points)
-      if(!is.matrix(data)){
-        return()
-      }
-      
-      w <- ncol(data) * 100
-      if(w < 900){
-        w <- 900
-      }
-      sin_path_plot_w(w)
-      
-      h <- nrow(data) * 20
-      if(h < 700){
-        h <- 700
-      }
-      sin_path_plot_h(h)
-    
-      pheatmap(data, scale = 'row', fontsize = 15, angle_col = "45", 
-               legend_breaks = c(-2, -1, 0, 1, 2), main = input$Single_pathway_plot_search)
-      
-      
-    })
-    
-    output$Single_pathway_plot_ui <- renderUI({
-    
-      if(is.null(pathfinder_abundance_data()) && is.null(normalized_counts())){
+      if(is.null(res) || is.null(md)){ return() }
+      if(is.null(p.ab) && is.null(norm)){
         return(span("Abundance or counts data is needed for this visual",style="color: red;"))
       }
       
-      if(!tolower(input$Single_pathway_plot_search) %in% tolower(pathfinder_results()$Term_Description)){
-        
-      }else{
-      
-        h <- paste0("", sin_path_plot_h(), "px")
-        w <- paste0("", sin_path_plot_w(), "px")
-        
-        plotOutput('Single_pathway_plot', height = h, width = w)
+      #   SET UP CASE VS CONTROL PARAM
+      #____________________________________
+      if(is.null(input$score_terms_cases)){
+        caseSamples <- NULL
+      } else {
+        caseSamples <- input$score_terms_cases
       }
+      
+      #     FIND COUNTS SOURCE
+      #__________________________________
+      #PRIORITIZE ABUNDANCE UPLOAD
+      if(!is.null(p.ab)){
+        ab <- p.ab
+      }
+      #RESORT TO NORMALIZED COUNTS
+      else if (!is.null(norm)){
+        ab <- norm
+        ab$Gene_symbol <- rownames(ab)
+        ab <- ab %>% select(Gene_symbol, everything())
+      }
+      #FINALLY GIVE UP
+      else{ return() }
+      
+      print(head(res, n=1))
+      print(head(ab, n=1))
+      #       CREATE THE PLOT
+      #____________________________
+      plotdata <- score_pathway_terms(
+        data = res,
+        abundance = ab,
+        cases = caseSamples,
+        repOnly = input$repOnly, 
+        pathways = NULL)
+      
+      #GATHER DIMENSIONS
+      h <- plotdata[[2]]
+      w <- plotdata[[3]]
+      
+      #RENDER PLOT
+      output$case_map_plot <- renderPlot({plotdata[[1]]})
+      
+      #RENDER UI
+      div(
+        plotOutput('case_map_plot', height = h, width = w)
+      )
+      
+    })
+
+    
+  #______________________________Path 5_______DONE_________________#----
+
+    output$Single_pathway_plot_ui <- renderUI({
+      
+      #LOCALIZE VARIABLES
+      res <- RCV.PATHWAY_RESULTS()
+      p.ab <- RCV.PATHWAY_ABUNDANCE()
+      norm <- RCV.NORMALIZED_COUNTS()
+      deg.res <- RCV.RESULTS_DDSC()
+      
+      #     REQUIRE DATA
+      #__________________________
+      
+      if(is.null(res)){ return() }
+      if(is.null(p.ab) && is.null(norm)){
+        return(span("Abundance or counts data is needed for this visual",style="color: red;"))
+      }
+      if(!tolower(input$Single_pathway_plot_search) %in% tolower(res$Term_Description)){
+        return(span("The searched pathway was not found",style="color: red;"))
+      }
+
+      #   FIND COUNTS SOURCE
+      #___________________________
+      #PRIORITIZE ABUNDANCE UPLOAD
+      if(!is.null(p.ab)){
+        
+        ab <- p.ab
+        ab$gene_name <- tolower(ab$Gene_symbol)
+        ab <- ab %>% select(-Gene_symbol)
+        
+      }
+      #RESORT TO NORMALIZED COUNTS
+      else if(!is.null(norm)){
+        
+       ab <- norm
+       ab$gene_name <- tolower(rownames(ab))
+                
+      }
+      #FINALLY GIVE UP
+      else{ return() }
+      
+      #   SET UP DEG SOURCE
+      #__________________________
+      #PRIORITIZE DEG EXPERIMENT
+      if(!is.null(deg.res)){
+        
+        d <- deg.res
+        d$gene_name <- tolower(rownames(d))
+        d_arg <- d %>% left_join(ab)
+        
+      }
+      #RESORT TO NULL Padj
+      else{
+        
+        ab$padj <- 0
+        d_arg <- ab
+        
+      }
+      
+      #   CREATE THE PLOT DATA
+      #_________________________________
+      data <- single_pathway_heatmap(
+        input$Single_pathway_plot_search, 
+        d_arg, 
+        res, 
+        genes_listed = input$Single_pathway_plot_num_points)
+      
+      #     ASSERT THE FUNCTION WORKED
+      #________________________________
+      if(!is.matrix(data)){ return() }
+      
+      #   SET UP PLOT DIMENSIONS
+      #_________________________________
+      w <- max(ncol(data) * 100, 900)
+      h <- max(nrow(data) * 20, 700)
+      w <- paste0(w, "px")
+      h <- paste0(h, "px")
+      
+      #   PLOT THE DATA
+      #______________________________
+      p <- pheatmap(data, 
+               scale = 'row', 
+               fontsize = 15, 
+               angle_col = "45", 
+               legend_breaks = c(-2, -1, 0, 1, 2), 
+               main = input$Single_pathway_plot_search)
+      
+      #RENDER PLOT
+      output$Single_pathway_plot <- renderPlot({p})
+      
+      #RENDER UI
+      div(
+        plotOutput('Single_pathway_plot', height = h, width = w)
+      )
       
     })
     

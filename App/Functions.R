@@ -3,11 +3,18 @@ library(readr)
 library(dplyr)
 library(shiny)
 
+
+
+##___________________UI FUNCTIONS________________________
+
 # Primitive function for displaying a modal that displays and error
 showErrorModal <- function(message) {
   showModal(modalDialog(tags$p(style = "color: red;", message), easyClose = TRUE, footer = NULL))
 }
 
+
+
+#________________FILTERING FUNCTIONS___________________________
 
 # Splits a DESeq result dataset into 3 dataframes base on fold change
 splitByExpr <- function(data, cut){
@@ -35,6 +42,22 @@ splitByExpr <- function(data, cut){
   
 }
 
+# Filters the raw counts upload
+filterCounts <- function(counts){
+  
+  keep <- rowSums(counts) > 10
+  
+  counts <- counts[keep,]
+  
+  counts <- counts
+  
+  return(counts)
+}
+
+
+
+
+#________________PLOTTING FUNTIONS___________________________
 
 # Returns a ggplot of the principle components
 principlePlot <- function(data, cond, genes, title, sub, cap){
@@ -104,90 +127,67 @@ principlePlot <- function(data, cond, genes, title, sub, cap){
 }
 
 
-#_____________________________________________________
 
-#READING THE COUNTS DATA
-readCountsUpload <- function(fileDataPath){
+
+##_____________EXPERIMENT FUNCTIONS______________________________
+
+# Function That runs pathfindR
+runPathfindRFunc <- function(data_source){
   
-  #                         READ FILE
-  #_______________________________________________________________
+  #Set up database
+  kegg <- plyr::ldply(pathfindR.data::kegg_genes, data.frame) %>% 
+    mutate(num_genes_in_path = 1) %>% 
+    dplyr::group_by(.data$.id) %>% 
+    dplyr::summarize(X..i.. = paste0(.data$X..i.., collapse = ", "), num_genes_in_path = sum(num_genes_in_path)) 
+  names(kegg)[1] <- "ID"
+  names(kegg)[2] <- "all_pathway_genes"
   
-  #Read the file as tsv
-  if(grepl('\\.tsv$', fileDataPath, ignore.case = TRUE)){
-    counts <- read.csv(fileDataPath, sep = "\t")
-  }
-  #Read the file as a csv
-  else if(grepl('\\.csv$', fileDataPath, ignore.case = TRUE)){
-    counts <- read.csv(fileDataPath)
-  }
-  #Unreadable file type
-  else{
-    showErrorModal('The counts matrix file is not a readable file')
-    return()
-  }
+  showModal(modalDialog("Finding Paths...", footer = NULL))
+  #Run pathfinder
   
-  #                   CHECK REQUIRED COLUMS
-  #_______________________________________________________________
-  
-  #Check for req columns
-  if(! all( c('gene_id', 'gene_name') %in% colnames(counts) ) ){
-    showErrorModal('Required columns ( gene_id or gene_name ) are missing in the counts matrix')
-    return()
-  }
-  
-  #                   CHECK DUPLICATE IDS
-  #_______________________________________________________________
-  
-  #Check duplicate ids
-  if(anyDuplicated(counts$gene_id)){
-    showErrorModal('There were duplicate ids in the counts matrix')
-    return()
-  }
-  
-  #                   FIND SAMPLE COLUMN NAMES
-  #_______________________________________________________________
-  sample_cols <- counts %>% select(starts_with('.'))
-  if(ncol(sample_cols) < 2){
-    showErrorModal('There were not enough samples present')
-    return()
-  }
-  
-  #                   SET THE RAW COUNTS DATA FRAME
-  #_______________________________________________________________
-  raw_counts <- counts
-  rownames(raw_counts) <- raw_counts$gene_name
-  raw_counts <- raw_counts %>% select(all_of(colnames(sample_cols)))
-  
-  #                       FILTER THE COUNTS
-  #_______________________________________________________________
-  filtered_counts <- filterCounts(raw_counts)
-  
-  #               CREATE A DATAFRAME OF GENE NAMES
-  #_______________________________________________________________
-  gene_names <- filtered_counts %>% 
-    mutate(gene_name = rownames(filtered_counts)) %>%
-    select(gene_name)
-  
-  #RETURN
-  return(list(gene_names, raw_counts, filtered_counts))
+  tryCatch({
+    
+    res <- run_pathfindR(data_source,
+                         pin_name_path = "KEGG",
+                         enrichment_threshold = 0.05,
+                         iterations = 25,
+                         list_active_snw_genes = TRUE)
+    
+    if(ncol(res) == 0 || nrow(res) == 0){
+      showErrorModal('No Enriched Terms were found for the provided pin')
+      return()
+    }
+    
+    if(length(intersect(colnames(res), colnames(kegg))) == 0){
+      showErrorModal("No common variables in pin and pathfinder output")  
+      return()
+    }
+    
+    res <- left_join(res, kegg)
+    
+    res_clustered <- cluster_enriched_terms(res,  
+                                            plot_dend = FALSE, 
+                                            plot_clusters_graph = FALSE)
+    
+    showModal(modalDialog("pathfindR complete with no fatal errors", easyClose = TRUE, footer = NULL))
+    
+    return(res_clustered)
+    
+  },
+  error = function(e) {
+    
+    showErrorModal(paste("Error in pathfindR process:", e$message))
+    
+  })
   
 }
 
-#FILTERING THE COUNTS DATA
-filterCounts <- function(counts){
-  
-  keep <- rowSums(counts) > 10
-  
-  counts <- counts[keep,]
-  
-  counts <- counts
-  
-  return(counts)
-}
-
-#_____________________________________________________
 
 
+
+#_____________FILE READING FUNCTIONS______________________________
+
+# Reads a DESeq2 output file csv
 #Returns (results, gene names, normalized counts, vst counts, vst object)
 readDEGFile <- function(fileDataPath, meta_data){
   
@@ -285,8 +285,7 @@ readDEGFile <- function(fileDataPath, meta_data){
 }
 
 
-
-
+# Reads a meta data file
 readMetaData <- function(fileDataPath){
   
   #                         READ FILE
@@ -328,8 +327,7 @@ readMetaData <- function(fileDataPath){
 }
 
 
-
-
+# Reads counts to be part of a pathfinder experiences as abundance data
 readPathfinderCountsUpload <- function(fileDataPath){
   
   #                         READ FILE
@@ -400,9 +398,7 @@ readPathfinderCountsUpload <- function(fileDataPath){
 }
 
 
-
-
-#Read file functions
+# Reads a pathfindR output file
 readPathfinderOutput <- function(fileDataPath){
   
   if(!is.null(fileDataPath)){
@@ -463,53 +459,69 @@ readPathfinderOutput <- function(fileDataPath){
 }
 
 
-# Function to actually run
-runPathfindRFunc <- function(data_source){
+# Reads the raw counts uploads
+readCountsUpload <- function(fileDataPath){
   
-  #Set up database
-  kegg <- plyr::ldply(pathfindR.data::kegg_genes, data.frame) %>% 
-    mutate(num_genes_in_path = 1) %>% 
-    dplyr::group_by(.data$.id) %>% 
-    dplyr::summarize(X..i.. = paste0(.data$X..i.., collapse = ", "), num_genes_in_path = sum(num_genes_in_path)) 
-  names(kegg)[1] <- "ID"
-  names(kegg)[2] <- "all_pathway_genes"
+  #                         READ FILE
+  #_______________________________________________________________
   
-  showModal(modalDialog("Finding Paths...", footer = NULL))
-  #Run pathfinder
+  #Read the file as tsv
+  if(grepl('\\.tsv$', fileDataPath, ignore.case = TRUE)){
+    counts <- read.csv(fileDataPath, sep = "\t")
+  }
+  #Read the file as a csv
+  else if(grepl('\\.csv$', fileDataPath, ignore.case = TRUE)){
+    counts <- read.csv(fileDataPath)
+  }
+  #Unreadable file type
+  else{
+    showErrorModal('The counts matrix file is not a readable file')
+    return()
+  }
   
-  tryCatch({
-    
-    res <- run_pathfindR(data_source,
-                         pin_name_path = "KEGG",
-                         enrichment_threshold = 0.05,
-                         iterations = 25,
-                         list_active_snw_genes = TRUE)
-    
-    if(ncol(res) == 0 || nrow(res) == 0){
-      showErrorModal('No Enriched Terms were found for the provided pin')
-      return()
-    }
-    
-    if(length(intersect(colnames(res), colnames(kegg))) == 0){
-      showErrorModal("No common variables in pin and pathfinder output")  
-      return()
-    }
-    
-    res <- left_join(res, kegg)
-    
-    res_clustered <- cluster_enriched_terms(res,  
-                                            plot_dend = FALSE, 
-                                            plot_clusters_graph = FALSE)
-    
-    showModal(modalDialog("pathfindR complete with no fatal errors", easyClose = TRUE, footer = NULL))
-    
-    return(res_clustered)
-    
-  },
-  error = function(e) {
-    
-    showErrorModal(paste("Error in pathfindR process:", e$message))
-    
-  })
+  #                   CHECK REQUIRED COLUMS
+  #_______________________________________________________________
+  
+  #Check for req columns
+  if(! all( c('gene_id', 'gene_name') %in% colnames(counts) ) ){
+    showErrorModal('Required columns ( gene_id or gene_name ) are missing in the counts matrix')
+    return()
+  }
+  
+  #                   CHECK DUPLICATE IDS
+  #_______________________________________________________________
+  
+  #Check duplicate ids
+  if(anyDuplicated(counts$gene_id)){
+    showErrorModal('There were duplicate ids in the counts matrix')
+    return()
+  }
+  
+  #                   FIND SAMPLE COLUMN NAMES
+  #_______________________________________________________________
+  sample_cols <- counts %>% select(starts_with('.'))
+  if(ncol(sample_cols) < 2){
+    showErrorModal('There were not enough samples present')
+    return()
+  }
+  
+  #                   SET THE RAW COUNTS DATA FRAME
+  #_______________________________________________________________
+  raw_counts <- counts
+  rownames(raw_counts) <- raw_counts$gene_name
+  raw_counts <- raw_counts %>% select(all_of(colnames(sample_cols)))
+  
+  #                       FILTER THE COUNTS
+  #_______________________________________________________________
+  filtered_counts <- filterCounts(raw_counts)
+  
+  #               CREATE A DATAFRAME OF GENE NAMES
+  #_______________________________________________________________
+  gene_names <- filtered_counts %>% 
+    mutate(gene_name = rownames(filtered_counts)) %>%
+    select(gene_name)
+  
+  #RETURN
+  return(list(gene_names, raw_counts, filtered_counts))
   
 }

@@ -14,7 +14,7 @@ library(patchwork)
 library(matrixStats)
 library(SummarizedExperiment)
 library(circlize)
-library(ComplexHeatmap)
+library(pheatmap)
 library(colourpicker)
 library(ggbeeswarm)
 library(ggrepel)
@@ -26,6 +26,7 @@ library(plotly)
 library(htmlwidgets)
 library(png)
 library(leaflet)
+library(grid)
 #----
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
@@ -105,7 +106,9 @@ ui <- tagList(tags$style(HTML("
               actionButton("run_DESeq2", "Run Differential Expression",
                            style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
                            )
-            )
+            ),
+            
+            uiOutput('contrast_selection_ui')
           )
         ),
         
@@ -225,26 +228,18 @@ tabPanel("Principle Component Plots",
 tabPanel("Correlation Anaylsis",
   fluidPage(
   
-    sidebarPanel( width=3,
-                  
-      uiOutput('heatmap_annotations'),
-      
-      selectInput("heat_body_color", "Select color palette", 
-                  choices=c("blue-red", "REV-Rainbow", "white-black")),
-      
-      uiOutput('color_pickers_heat'),
+    sidebarPanel( width=2,
       
       HTML("<h3>Labels</h3>"),
     
       textInput('title_heatmap_plot', 'Title', value = 'Sample Correlation'),
-      textInput('subtitle_heatmap_plot', 'Sub Title', value = ''),
-      textAreaInput('caption_heatmap_plot', 'Caption', value = '', width=200, rows=3)
+      
       
     ),
     
-    mainPanel( width=9,     
+    mainPanel(width = 10,     
     
-      uiOutput('heatmap_plots_ui')
+      uiOutput('heatmap_plot_ui')
     
     ),
 

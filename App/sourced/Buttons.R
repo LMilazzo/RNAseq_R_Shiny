@@ -14,8 +14,16 @@ reloadApplication <- function(){
 downloadZipButton <- function(){
   return(
     shiny::downloadButton(
-      outputId = 'downloadTemp', 
+      outputId = 'downloadZip', 
       label = 'Download Saved files'
     )
   )
+}
+
+
+#Saves a plot on the current page
+savePlotButton <- function(){
+  
+  return(actionButton("save", "SAVE"))
+  
 }

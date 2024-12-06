@@ -788,7 +788,8 @@ server <- function(input, output, session) {
           height = h.inches, 
           width = w.inches, 
           units = "in", 
-          dpi = 230
+          dpi = 230,
+          limitsize = FALSE
         )
         showNotification("Plot saved successfully!", type = "message")
       } else {
@@ -799,18 +800,19 @@ server <- function(input, output, session) {
   })
   
   
-  
-  output$downloadTemp <- downloadHandler(
+  output$downloadZip <- downloadHandler(
     filename = function() {
-      "SaveFiles.zip"
+      "test.zip"
     },
     content = function(file) {
-      # Logic to create the zip file
-      zip(
-        zipfile = file, # Name of the resulting zip file
-        files = list.files("SavedFiles", full.names = TRUE) # Files inside the directory to include in the zip
-      )
-    }
+      
+      files <- list.files("SavedFiles", full.names = TRUE)
+      print(files)
+      
+      zip(zipfile = file, files = files)
+      
+    },
+    contentType = "application/zip"
   )
   
   

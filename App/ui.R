@@ -1,7 +1,7 @@
 
 #Sourced Files
 source("sourced/Functions.R")
-source("sourced/PackageSetup.R")
+source("sourced/LoadPackages.R")
 source("sourced/Buttons.R")
 
 #Load packages
@@ -76,7 +76,7 @@ tabPanel("Diffrentially Expressed Genes",
 
 #Page 2 functional button row ----
 
-#Top row of buttons [ reload, new exp, old exp, run, contrasts, downloadZip ]
+#Top row of buttons [ reload, new exp, old exp, run, contrasts]
 fluidRow(
   
   #Reload application
@@ -125,15 +125,7 @@ fluidRow(
     width = 2,
     offset = 1,
     uiOutput('contrast_selection_ui')
-  ),
-  
-  #Download zip file of saved files
-  column(
-    width = 1,
-    offset = 1,
-    downloadZipButton()
   )
- 
 ),
         
 #Page 2 Main panel set up ----
@@ -310,6 +302,7 @@ tabPanel(
         'Title', 
         value = 'Sample Correlation'
       ),
+      savePlotButton()
     ),
     
     #main panel
@@ -343,7 +336,9 @@ tabPanel(
     #main panel
     mainPanel(
       width=6,
-      uiOutput('gene_count_search')
+      uiOutput('gene_count_search'),
+      br(),
+      savePlotButton()
     ), 
     
     #side panel
@@ -415,8 +410,8 @@ tabPanel(
       #Plot labels
       textInput('title_volc_plot', 'Title', value = 'Gene Expression'),
       textInput('subtitle_volc_plot', 'Sub Title', value = ''),
-      textAreaInput('caption_volc_plot', 'Caption', value = '', width = 200, rows = 3)         
-    
+      textAreaInput('caption_volc_plot', 'Caption', value = '', width = 200, rows = 3),
+      savePlotButton(),
     ),
     
     #main panel
@@ -442,7 +437,7 @@ tabPanel("Pathway Analysis",
 
 #Page 3 Functional button row ----
 
-#Top row of buttons [ reload, run, old exp, downloadZip ]
+#Top row of buttons [ reload, run, old exp]
 fluidRow(
   
   #Reload application
@@ -471,15 +466,7 @@ fluidRow(
         'Review A Pathway Analysis Experiment'
       )
     )
-  ),
-  
-  #Download zip file of saved files
-  column(
-    width = 1,
-    offset = 1,
-    downloadZipButton()
   )
-  
 ),
 
 #Page 3 Main panel set up ----  
@@ -521,7 +508,17 @@ tabPanel(
   fluidPage(
     
     #Slider for number of clusters included 
-    uiOutput('enrichment_clusters_shown'),
+    fluidRow(
+      column(
+        width = 4,
+        uiOutput('enrichment_clusters_shown')
+      ),
+      column(
+        width = 1, 
+        offset = 2,
+        savePlotButton()
+      )
+    ),
     
     #sidebar
     sidebarPanel(
@@ -557,10 +554,9 @@ tabPanel(
     
     #main panel
     mainPanel(
-      width = 9,
+      width = 8,
       uiOutput('enrichmentUI')
     )
-    
   )#fluid page
 ), 
 #Heatmaps tab 3 ----
@@ -573,8 +569,9 @@ tabPanel(
     sidebarPanel(
       width = 3,
       
-      #link to open interactive plotly
-      uiOutput('open_in_new_tab10'), 
+      #link to open interactive plotly or save plot
+      fluidRow(column(2,uiOutput('open_in_new_tab10')), column(2, offset = 4,savePlotButton())), 
+      br(),
       
       #search for genes text box
       textInput(
@@ -626,7 +623,9 @@ tabPanel(
       ),
       
       # a table with the meta data file for reference
-      uiOutput('sample_conditions_PreviewTable11')
+      uiOutput('sample_conditions_PreviewTable11'),
+      
+      savePlotButton()
     ),
     
     #main panel
@@ -660,7 +659,9 @@ tabPanel(
         'Number of genes to visualize (priority to lowest pvals',
         value = 40,
         min = 10
-      )
+      ),
+      
+      savePlotButton()
     ),
     
     #main panel
@@ -677,10 +678,18 @@ tabPanel(
       ) #Hidden
     ) #Main Panel
   ) #High level fluid page
-) #High level tab panel
+), #High level tab panel
 
 #High level tab panel closing ----
-  )#End of tabPanel list
+  #download button
+  header = tags$ul(
+    class = "nav navbar-nav navbar-right", # Align to the right
+    tags$li(
+      style = "padding: 0px 45px 0 0; margin-bottom: 0px;", # Top, right, bottom, left,
+      downloadZipButton()
+    )
+  )
+)#End of tabPanel list
 
 #UI tag list closing ----
 )#End of tag list ui

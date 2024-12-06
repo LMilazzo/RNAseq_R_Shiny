@@ -1,5 +1,5 @@
 #_________________________________Shiny Server__________________________________________
-server <- function(input, output) {
+server <- function(input, output, session) {
 
   #reload app
   observeEvent(input$reload_app,{
@@ -55,7 +55,7 @@ server <- function(input, output) {
   
 #---- 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
-#~~~~~######_______________WORKFLOW________________######~~~~~#
+#~~~~~######_______________Running Workflow___________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
 #Differential Expression Things______________________________________________
@@ -691,12 +691,135 @@ server <- function(input, output) {
   })
 #----
   
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
+#~~~~~######____________Save Functionality____________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+#----
+
+  #Unlink temp directory on session end
+  session$onSessionEnded(function() {
+    # List all files in the directory
+    files <- list.files("SavedFiles", full.names = TRUE)
+    
+    # Remove all files in the directory
+    unlink(files, recursive = TRUE, force = TRUE)
+    print("unlinked temp dir")
+  })
+  
+  #list(output, plot, class, h, w )
+  #SAVE ASSISTANCE REACTIVE SAVES, Reflects currently displayed visuals
+  d.PLOT.PCA <- reactiveVal(NULL) 
+  d.PLOT.CORRELATION <- reactiveVal(NULL)
+  d.PLOT.GENE <- reactiveVal(NULL)
+  d.PLOT.VOLCANO <- reactiveVal(NULL)
+  
+  p.PLOT.ENRICHMENT <- reactiveVal(NULL)
+  p.PLOT.LARGEMAP <- reactiveVal(NULL)
+  p.PLOT.CASEENRICHMENT <- reactiveVal(NULL)
+  p.PLOT.PATHWAY <- reactiveVal(NULL)
+  
+  #Iterator for event 
+  i.EventID <- reactiveVal(0)
+  #Update temp directoru with new plot
+  observeEvent(input$save,{
+    
+    #iterate
+    i.EventID(i.EventID() + 1)
+    
+    #find current page
+    getSection <- input$App
+    page <- switch(
+              getSection, 
+              "Diffrentially Expressed Genes" = input$TabSet1,
+              "Pathway Analysis" = input$TabSet2
+            )
+    
+    selected <- switch(
+            page,
+            "Principle Component Plots" =  d.PLOT.PCA(),
+            "Correlation Anaylsis" = d.PLOT.CORRELATION(),
+            "Gene Counts" = d.PLOT.GENE(),
+            "Volcano Plot" = d.PLOT.VOLCANO(),
+            
+            "Term Enrichment" = p.PLOT.ENRICHMENT(),
+            "Term Gene Heatmap" = p.PLOT.LARGEMAP(),
+            "Case vs. Control" = p.PLOT.CASEENRICHMENT(),
+            "Single Pathway vs. Samples" = p.PLOT.PATHWAY(),
+            NULL
+          )
+    
+    # Ensure a plot is selected
+    if (is.null(selected)) {
+      #Nothing to save
+      return()
+    }
+    
+    #Pixels per inch = 150 standard
+    h.inches <- as.numeric(gsub("[^0-9]", "", selected$h)) / 72
+    w.inches <- as.numeric(gsub("[^0-9]", "", selected$w)) / 50
+    
+    if(!is.ggplot(selected$plot)){
+      toplot <- as.ggplot(selected$plot)
+    }else{
+      toplot <- selected$plot
+    }
+    
+    #Formulate event ID
+    eventID <- paste0("confirm_save_", i.EventID())
+    
+    showModal(
+      modalDialog(
+        textInput("save_plot_name", "File Name"),
+        footer = actionButton(eventID, "Save")
+      )
+    )
+    
+    # Wait for the user to confirm
+    observeEvent(input[[eventID]], {
+      # Ensure the modal is closed
+      removeModal()
+      
+      # Validate file name and save plot
+      if (!is.null(input$save_plot_name) && input$save_plot_name != "") {
+        ggsave(
+          paste0(input$save_plot_name, ".pdf"), 
+          path = "SavedFiles",
+          plot = toplot, 
+          height = h.inches, 
+          width = w.inches, 
+          units = "in", 
+          dpi = 230
+        )
+        showNotification("Plot saved successfully!", type = "message")
+      } else {
+        showNotification("Please provide a valid file name", type = "error")
+      }
+    })
+    
+  })
+  
+  
+  
+  output$downloadTemp <- downloadHandler(
+    filename = function() {
+      "SaveFiles.zip"
+    },
+    content = function(file) {
+      # Logic to create the zip file
+      zip(
+        zipfile = file, # Name of the resulting zip file
+        files = list.files("SavedFiles", full.names = TRUE) # Files inside the directory to include in the zip
+      )
+    }
+  )
+  
+  
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
 #~~~~~######____________Output $ Objects______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #----
   
-  #Help Tab
+  #Help Page
   #_______________________Interactive Flow Map_____________________#----
   
     output$interactive_image <- renderPlotly({
@@ -771,12 +894,9 @@ server <- function(input, output) {
         )
       fig
     })
-  
-  
-  
-  
-  
-  #Page1 pretab----
+  #----
+
+  #Page1 pretabSET----
     output$about_DESeq2 <- renderUI({
       includeHTML('www/DESeq2_Intro.HTML')
     })
@@ -827,7 +947,7 @@ server <- function(input, output) {
   #----
   
   #TabSet 1
-  #______________________________Diff 1_______DONE_________________#----
+  #______________________________Diff 1________________________#----
   
     # Raw Counts data table 
     output$raw_counts_PreviewTable <- renderUI({
@@ -902,7 +1022,7 @@ server <- function(input, output) {
     })
     
 
-  #______________________________Diff 2_______DONE_________________#----
+  #______________________________Diff 2________________________#----
     
     # 3 tables feature genes that fit in expression categories
     output$expression_tables <- renderUI({
@@ -998,10 +1118,10 @@ server <- function(input, output) {
         
     })
     
-  #______________________________Diff 4_______DONE_________________#----
+  #_____________PCA______________Diff 4________________________#----
     
     # The principle component plot
-    output$principle_components <- renderPlot({
+    output$principle_component_plots_ui <- renderUI({
       
       #LOCALIZE VARIABLES
       vst <- RCV.VST_OBJ()
@@ -1016,22 +1136,31 @@ server <- function(input, output) {
                                 input$subtitle_pca_plot, 
                                 input$caption_pca_plot)
       
-      pca_plot
+      #RENDER
+      output$principle_components <- renderPlot({pca_plot})
       
-    })
-    
-    # UI holding the plot
-    output$principle_component_plots_ui <- renderUI({
-      
-      #LOCALIZE VARiABLES
-      vst <- RCV.VST_OBJ()
-      
+      #CHECK BEFORE SHOW
       if(is.null(vst) || length(input$pca_cond) == 0){
         return(span("No Data Yet, Or No Selected Factors",style="color: red;"))
       }
-
-      plotOutput('principle_components', height= "700px", width = "100%")
-    
+      
+      #CREATE OUTPUT
+      p.out <- plotOutput('principle_components', height= "700px", width = "100%")
+      
+      #SAVE
+      d.PLOT.PCA(
+        list(
+          output = p.out, 
+          plot = pca_plot, 
+          class = class(pca_plot), 
+          h = "700px",
+          w = "800px"
+        )
+      )
+      
+      #PRINT
+      p.out
+      
     })
     
     # Widget for changing genes used in plot
@@ -1063,8 +1192,13 @@ server <- function(input, output) {
         p("If the default 500 is selected the top 500 genes with the most variance will be used."),
         p(paste("Max: ", m)),
         p("Min: 2"),
-        numericInput('pca_nrow', '', 
-                    value=start, min=2, max=m)
+        numericInput(
+          'pca_nrow', 
+          '', 
+          value = start, 
+          min = 2, 
+          max = m
+        )
       )
     })
     
@@ -1082,7 +1216,7 @@ server <- function(input, output) {
       )
     })
     
-  #______________________________Diff 5_______DONE_________________#----
+  #_____________Correlation______Diff 5________________________#----
     
     # The heatmap for correlation analysis
     output$heatmap_plot_ui <- renderUI({
@@ -1127,19 +1261,29 @@ server <- function(input, output) {
                cellheight = 650 / nrow(vst_cor)
             )
       
-      output$heatmap_plot_1 <- renderPlot({
-        p
-      })
+      output$heatmap_plot_1 <- renderPlot({p})
       
       #RENDER UI
+      p.out <- plotOutput('heatmap_plot_1', height = "850px", width = "100%")
       
-      plotOutput('heatmap_plot_1', height = "850px", width = "100%")
+      #SAVE
+      d.PLOT.CORRELATION(
+        list(
+          output = p.out, 
+          plot = p, 
+          class = class(p), 
+          h = "1000px", 
+          w = "1000px"
+        )
+      )
       
+      #print
+      p.out
       
     })
   
     
-  #______________________________Diff 6_______DONE_________________#----
+  #_____________GPlot____________Diff 6________________________#----
     
     # A ui bar on the left displaying some important genes 
     output$leftbar_gene_plots <- renderUI({
@@ -1270,8 +1414,23 @@ server <- function(input, output) {
               res <- res[1,]
             }
             
-            x <- gplop(res, meta_data, input$gene_count_plot_search_cond)
-            renderPlot({x})
+            plot <- gplop(res, meta_data, input$gene_count_plot_search_cond)
+            output$sGene <- renderPlot({plot})
+            p.out <- plotOutput('sGene')
+            
+            #saving
+            d.PLOT.GENE(
+              list(
+                output = p.out, 
+                plot = plot, 
+                class = class(plot), 
+                h = "600px", 
+                w = "600px"
+              )
+            )
+
+            #print
+            p.out
             
           }else{
             p("Nothing Here Yet")
@@ -1282,10 +1441,10 @@ server <- function(input, output) {
       )
     })
     
-  #______________________________Diff 7_______DONE_________________#----
+  #_____________Volcano__________Diff 7________________________#----
   
     # The plot for the volcano plot page
-    output$volcano_plot <- renderPlot({
+    output$volcano_plot_ui <- renderUI({
       
       #LOCALIZE VARIABLES
       results <- RCV.RESULTS_DDSC()
@@ -1340,33 +1499,35 @@ server <- function(input, output) {
                      subtitle, 
                      caption)
       
-      plot
+      output$volcano_plot <- renderPlot({plot})
+      p.out <- plotOutput('volcano_plot', height= "900px", width = "100%")
       
-    })
-    # A ui for displaying the volcano plot
-    output$volcano_plot_ui <- renderUI({
+      #save
+      d.PLOT.VOLCANO(
+        list(
+          output = p.out, 
+          plot = plot, 
+          class = class(plot), 
+          h = "900px", 
+          w = "1000px"
+        )
+      )
       
-      #LOCALIZE VARIABLES
-      results <- RCV.RESULTS_DDSC()
-      
-      if(is.null(results)){
-        return(span("No Data Yet",style="color: red;"))
-      }
-      
-      plotOutput('volcano_plot', height= "900px", width = "100%")
+      #print
+      p.out
       
     })
 
   #----
     
-  #Page2 pretab----
+  #Page2 pretabSET----
     output$about_pathfinder <- renderUI({
       includeHTML('www/PathfindR_Intro.HTML')
     })
   #----  
   
   #Tabset 2
-  #______________________________Path 1_______DONE_________________#----
+  #______________________________Path 1________________________#----
     
     output$pathfinderPreview <- renderUI({
       
@@ -1383,7 +1544,7 @@ server <- function(input, output) {
       
     })
   
-  #______________________________Path 2_______DONE_________________#----
+  #______________Enrichment______Path 2________________________#----
     
     output$enrichmentUI <- renderUI({
       
@@ -1460,7 +1621,21 @@ server <- function(input, output) {
       
       #           CREATE UI
       #________________________________
-      div( plotOutput('enrichmentChart', height = h, width = w) )
+      p.out <- plotOutput('enrichmentChart', height = h, width = w)
+      
+      #save
+      p.PLOT.ENRICHMENT(
+        list(
+          output = p.out, 
+          plot = chart, 
+          class = class(chart), 
+          h = h, 
+          w = w
+        )
+      )
+      
+      #print
+      div(p.out)
       
     })
     
@@ -1539,7 +1714,7 @@ server <- function(input, output) {
       
     })
     
-  #______________________________Path 3_______DONE_________________#----
+  #______________Heatmap_________Path 3________________________#----
   
     plot10 <- reactiveVal(NULL)
     
@@ -1580,7 +1755,6 @@ server <- function(input, output) {
       actionButton('open_in_new_tab10', 
                    "Open in new tab")    
     })
-    
     
     #DATA TABLE OF PATHWAYS
     output$pathwaysDT10 <- renderUI({
@@ -1697,27 +1871,43 @@ server <- function(input, output) {
       plotlie$x$layout$height <- plotlie$x$layout$height + 200
       plot10(plotlie)
       
+      
+      edits <- plot[[1]] +
+        theme(
+          axis.text.y = element_text(size = 15),
+          axis.text.x = element_text(size = 15),
+          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 10)
+        ) +
+        scale_x_discrete(position = 'top')
+      
       #CREATE PLOT OUTPUT
       output$plot_heatmap_10 <- renderPlot({
-        plot[[1]] +
-          theme(
-            axis.text.y = element_text(size = 15),
-            axis.text.x = element_text(size = 15),
-            legend.text = element_text(size = 10),
-            legend.title = element_text(size = 10)
-          ) +
-          scale_x_discrete(position = 'top')
+        edits
       }) 
       
       #UI OUTPUT
-      plotOutput('plot_heatmap_10', 
+      p.out <- plotOutput('plot_heatmap_10', 
                  width = paste0(plot[[2]]$x$layout$width + 200, "px"), 
                  height = paste0(plot[[2]]$x$layout$height + 275, "px"))
       
+      #save
+      p.PLOT.LARGEMAP(
+        list(
+          output = p.out, 
+          plot = edits, 
+          class = class(edits), 
+          h = paste0(plot[[2]]$x$layout$height + 275, "px"), 
+          w = paste0(plot[[2]]$x$layout$width + 200, "px")
+        )
+      )
+      
+      #print
+      p.out
       
     })
     
-  #______________________________Path 4_______DONE_________________#----
+  #______________Case____________Path 4________________________#----
   
     output$sample_conditions_PreviewTable11 <- renderUI({
       
@@ -1810,15 +2000,27 @@ server <- function(input, output) {
       #RENDER PLOT
       output$case_map_plot <- renderPlot({plotdata[[1]]})
       
-      #RENDER UI
-      div(
-        plotOutput('case_map_plot', height = h, width = w)
+      p.out <- plotOutput('case_map_plot', height = h, width = w)
+      
+      #save
+      p.PLOT.CASEENRICHMENT(
+        list(
+          output = p.out, 
+          plot = plotdata[[1]], 
+          class = class(plotdata[[1]]), 
+          h = h, 
+          w = w
+        )
       )
+      
+      #print
+      p.out
+      
       
     })
 
     
-  #______________________________Path 5_______DONE_________________#----
+  #______________Pathway_________Path 5________________________#----
 
     output$Single_pathway_plot_ui <- renderUI({
       
@@ -1898,7 +2100,7 @@ server <- function(input, output) {
       
       #   PLOT THE DATA
       #______________________________
-      p <- pheatmap(data, 
+      plot <- pheatmap(data, 
                scale = 'row', 
                fontsize = 15, 
                angle_col = "45", 
@@ -1906,12 +2108,23 @@ server <- function(input, output) {
                main = input$Single_pathway_plot_search)
       
       #RENDER PLOT
-      output$Single_pathway_plot <- renderPlot({p})
+      output$Single_pathway_plot <- renderPlot({plot})
       
-      #RENDER UI
-      div(
-        plotOutput('Single_pathway_plot', height = h, width = w)
+      p.out <- plotOutput('Single_pathway_plot', height = h, width = w)
+      
+      #save
+      p.PLOT.PATHWAY(
+        list(
+          output = p.out, 
+          plot = plot, 
+          class = class(plot), 
+          h = h, 
+          w = w
+        )
       )
+      
+      #print
+      p.out
       
     })
     

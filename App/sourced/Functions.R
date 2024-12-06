@@ -126,7 +126,12 @@ principlePlot <- function(data, cond, genes, title, sub, cap){
       return(pca_plot)
 }
 
-
+#Saves a plot on the current page
+savePlotButton <- function(){
+  
+  return(actionButton("save", "SAVE"))
+  
+}
 
 
 ##_____________EXPERIMENT FUNCTIONS______________________________

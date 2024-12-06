@@ -1,37 +1,18 @@
-#Import Shiny and needed packages
-#----
-#----
-library(shiny)
-library(shinythemes)
-library(DT)
-library(dplyr)
-library(readr)
-source("Functions.R")
-library(DESeq2)
-library(ggplot2)
-library(ggplotify)
-library(patchwork)
-library(matrixStats)
-library(SummarizedExperiment)
-library(circlize)
-library(pheatmap)
-library(colourpicker)
-library(ggbeeswarm)
-library(ggrepel)
-library(BioVis)
-library(pathfindR)
-library(tidyr)
-library(shinyjs)
-library(plotly)
-library(htmlwidgets)
-library(png)
-library(leaflet)
-library(grid)
-#----
+
+#Sourced Files
+source("sourced/Functions.R")
+source("sourced/PackageSetup.R")
+source("sourced/Buttons.R")
+
+#Load packages
+runLibs()
+
+#App options and settings ----
 
 options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
-ui <- tagList(tags$style(HTML("
+#CSS
+tags.css <- tags$style(HTML("             
     /* Custom CSS for DataTable */
     .dataTables_wrapper .dataTables_length, 
     .dataTables_wrapper .dataTables_filter, 
@@ -53,437 +34,655 @@ ui <- tagList(tags$style(HTML("
     zoom: 0.8; /* Other non-webkit browsers */
     zoom: 80%; /* Webkit browsers */
     }
-  ")),
-  useShinyjs(),
-  
-  navbarPage("", selected = "Diffrentially Expressed Genes", 
-    theme = shinytheme("slate"),
-#----
-  
-# Page 1__________________________________________________________________#----
+  "))
 
-  tabPanel("Help",
-           
-    fluidPage(
-      plotlyOutput('interactive_image')
-    )
-           
-  ),
+#App UI tag List ----
+
+ui <- 
+  
+  tagList(
     
-
-# Page 2__________________________________________________________________#----
-
-   tabPanel("Diffrentially Expressed Genes",
-      fluidPage(
-        
-        fluidRow(
-          column(1,
-            div(
-              actionButton('reload_app', 
-                           'Reload Application', 
-                           style = "background-color: #FF6F61; color: #FF6F61; border-color: #FF6F61;")
-            )
-          ),
-        
-          column(6, offset = 1,
-        
-            div(id = 'Page1_Upload_Options',
-              fluidRow(
-        
-                column(2,
-                  actionButton('start_new_experiment', 'Start New Experiment',
-                               style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
-                               )
-                ),
-        
-                column(2, offset = 2,
-                  actionButton('start_old_experiment', 'Review A Previous Experiment')
-                )
-              )
-            ),
-        
-            hidden(
-              actionButton("run_DESeq2", "Run Differential Expression",
-                           style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
-                           )
-            ),
-            
-            uiOutput('contrast_selection_ui')
-          )
-        ),
-        
-            
-# Tabset 1 Diffrential Expression Analysis________________________________#
-          br(),
-          mainPanel(width = 12,
-            
-            uiOutput('about_DESeq2'),
-                    
-            div(id = 'preRun_Data_Preview',
-                uiOutput('preRun_preview1'),
-                uiOutput('preRun_preview2')
-            ),
-                    
-            hidden(
-              div(id="TabSet1_Diffrential_Expression_Analysis",
-                tabsetPanel(
-
-#TABS 
-# Preview_________________________________________________________________#----
-tabPanel("Data Preview", 
-         
-  sidebarPanel(width = 6,
-         
-   HTML("<h3>Counts Matrix</h3>"),
-   
-   uiOutput('raw_counts_PreviewTable'),
+    tags.css, # add css
   
-  ),
-  
-  sidebarPanel(width = 6,
-  
-    HTML("<h3>Normalized Counts</h3>"),
+    useShinyjs(), #initialize shiny javascript
     
-    uiOutput('normalized_counts_PreviewTable')
-               
-  ),
+#Top level navigation bar setup ---- 
 
- HTML("<h3>Sample Conditions</h3>"),
- 
- uiOutput('sample_conditions_PreviewTable'),
-   
-   
+navbarPage(
+  id = "App",
+  title = "", 
+  selected = "Diffrentially Expressed Genes", #Initial child page
+  theme = shinytheme("slate"),
+  
+#______Navigation page 1 "Help"______ ----
+
+tabPanel(
+  title = "Help",
+  
+  fluidPage(
+    
+    plotlyOutput('interactive_image')
+  
+  )
+     
 ),
-# DEG analysis____________________________________________________________#----
-tabPanel("Diffrential Analysis",
+    
+
+#______Navigation page 2 "Differential Expressed Genes"_____ ----
+
+tabPanel("Diffrentially Expressed Genes",
+
+  fluidPage(
+
+#Page 2 functional button row ----
+
+#Top row of buttons [ reload, new exp, old exp, run, contrasts, downloadZip ]
+fluidRow(
+  
+  #Reload application
+  column(
+    width = 1, 
+    div(reloadApplication())
+  ),
+    
+  #Experiment starting point options
+  div(
+    id = 'Page1_Upload_Options',
+    column(
+      width = 1,
+      offset = 1,
+      actionButton(
+        'start_new_experiment', 
+        'Start New Experiment',
+        style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
+      )
+    ),
+    column(
+      width = 2,
+      offset = 1,
+      actionButton(
+        'start_old_experiment', 
+        'Review A Previous Experiment'
+      )
+    )
+  ),
+  
+  #Run button ( start hidden )
+  column(
+    width = 1,
+    offset = 1,
+    hidden(
+      actionButton(
+        "run_DESeq2", 
+        "Run Differential Expression",
+        style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
+      )
+    )
+  ),
+  
+  #Contrast selection drop down
+  column(
+    width = 2,
+    offset = 1,
+    uiOutput('contrast_selection_ui')
+  ),
+  
+  #Download zip file of saved files
+  column(
+    width = 1,
+    offset = 1,
+    downloadZipButton()
+  )
+ 
+),
+        
+#Page 2 Main panel set up ----
+
+br(),
+
+mainPanel(
+  width = 12,
+  
+#Page 2 HTML Info Page ( pre data only) ----
+  
+uiOutput('about_DESeq2'), #HTML Info Page
+
+#Page 2 upload previews ----
+
+div(
+  id = 'preRun_Data_Preview',
+  uiOutput('preRun_preview1'),
+  uiOutput('preRun_preview2')
+),
+
+#Page 2 Bulk TabSet setup ----  
+
+hidden( #Start hidden
+  
+  div(
+    id = "TabSet1_Diffrential_Expression_Analysis", 
+    
+    tabsetPanel(
+      id = "TabSet1",
+
+#Preview Experiment tab 1 ----
+
+tabPanel(
+  title = "Data Preview", 
+
+  #Side Bar Raw Counts preview
+  sidebarPanel(
+    width = 6,
+    HTML("<h3>Counts Matrix</h3>"),
+    uiOutput('raw_counts_PreviewTable')
+  ),
+  
+  #Side Bar Normalized counts preview
+  sidebarPanel(
+    width = 6,
+    HTML("<h3>Normalized Counts</h3>"),
+    uiOutput('normalized_counts_PreviewTable')
+  ),
+
+  #Bottom page Condition Preview
+  HTML("<h3>Sample Conditions</h3>"),
+  uiOutput('sample_conditions_PreviewTable'),
+  
+),
+
+#DEG analysis tab 2 ----
+
+tabPanel(
+  title = "Diffrential Analysis",
+  
+  #Page setup
   fluidPage(
     sidebarLayout(
     
+      #Side bar 
       sidebarPanel(
-      
-        #Pvalue box
-        selectInput("pvaluePg2", 
-        "Select adjusted P value cutoff for following tables", 
-        choices=c(1.0 ,0.5, 0.05, 0.01, 0.001)),
+        #Pvalue select box
+        selectInput(
+          "pvaluePg2", 
+          "Select adjusted P value cutoff for following tables", 
+          choices=c(1.0 ,0.5, 0.05, 0.01, 0.001)
+        ),
         
         #Stat check box
-        checkboxGroupInput('display_col', 
-              'Values of Interest (may take longer to load if more selected)', 
-              c('Base Mean' = 'baseMean', 
-                'Log2 Fold Change' ='log2FoldChange',
-                'lfcSE' ='lfcSE',
-                'Stat' ='stat',	
-                'P-Value' ='pvalue'),
-              selected=c('log2FoldChange'),
-              inline=FALSE),
+        checkboxGroupInput(
+          'display_col', 
+          'Values of Interest (may take longer to load if more selected)', 
+          choices = c(
+            'Base Mean' = 'baseMean', 
+            'Log2 Fold Change' ='log2FoldChange',
+            'lfcSE' ='lfcSE',
+            'Stat' ='stat',	
+            'P-Value' ='pvalue'
+          ),
+          selected=c('log2FoldChange'),
+          inline=FALSE
+        ),
         
-        #Distribution
+        #Distribution of fold change
         uiOutput("Distribution_Histogram_ui")
-      
       ),
       
+      #Main Panel
       mainPanel(
-      
         #Cutoff Slider
-        sliderInput('cutOffs', 
-        'Cut-off values for the genes being displayed as a certain direction of diffrential expression', 
-        min=-12, max=12, step=0.10, value = c(-0.5, 0.5), width='100%'),
+        sliderInput(
+          'cutOffs', 
+          'Cut-off values for the genes being displayed as a certain direction of diffrential expression', 
+          min=-12, 
+          max=12, 
+          step=0.10, 
+          value = c(-0.5, 0.5), 
+          width='100%'
+        ),
         
         #Data tables
         uiOutput('expression_tables')
-        
       )
-    )
-  )
+      
+    )#Sidebar
+  )#fluid page
 ),
-# Principle Component Analysis____________________________________________#----
-tabPanel("Principle Component Plots",
+
+#PCA tab 3 ----
+tabPanel(
+  "Principle Component Plots",
+  
   fluidPage(
   
-    sidebarPanel(width=3,
-                 
+    #side bar
+    sidebarPanel(
+      width=3,
+      
       HTML("<h3>Data</h3>"),
-     
       uiOutput('pca_n_counts'),
-     
       uiOutput('pca_metadata'),
-     
+      
       HTML("<h3>Labels</h3>"),
       
-      textInput('title_pca_plot', 'Title', value = 'Principle Component Analysis of Sample Varience'),
-      textInput('subtitle_pca_plot', 'Sub Title', value = 'Colored by sample traits'),
-      textAreaInput('caption_pca_plot', '', value = '', width=200, rows=3)
-             
+      textInput(
+        'title_pca_plot', 
+        'Title', 
+        value = 'Principle Component Analysis of Sample Varience'
+      ),
+      textInput(
+        'subtitle_pca_plot', 
+        'Sub Title', 
+        value = 'Colored by sample traits'
+      ),
+      textAreaInput(
+        'caption_pca_plot', 
+        '', 
+        value = '', 
+        width=200, 
+        rows=3
+      ),
+      
+      savePlotButton()
+      
     ),
-       
-    mainPanel(width=9,     
-          
+    
+    #main panel
+    mainPanel(
+      width = 9,     
       uiOutput('principle_component_plots_ui')
-          
     )
     
-  )
+  )#fluidpage
 ),
-# Correlation Analysis____________________________________________________#----
-tabPanel("Correlation Anaylsis",
+
+#Correlation Analysis tab 4 ----
+tabPanel(
+  "Correlation Anaylsis",
+  
   fluidPage(
   
-    sidebarPanel( width=2,
-      
+    #side bar
+    sidebarPanel( 
+      width=2,
       HTML("<h3>Labels</h3>"),
-    
-      textInput('title_heatmap_plot', 'Title', value = 'Sample Correlation'),
-      
-      
+      textInput(
+        'title_heatmap_plot', 
+        'Title', 
+        value = 'Sample Correlation'
+      ),
     ),
     
-    mainPanel(width = 10,     
-    
+    #main panel
+    mainPanel(
+      width = 10,     
       uiOutput('heatmap_plot_ui')
-    
     ),
 
-  ) 
+  )#fluid page
 ),
-# Gene Counts_____________________________________________________________#----
-tabPanel("Gene Counts",
+#Gene Counts tab 5 ----
+tabPanel(
+  "Gene Counts",
+  
   fluidPage(
   
-    sidebarPanel(width=4,
-                
-      selectInput("pvaluePg6", "Select adjusted P value cutoff for following plots", 
-                  choices=c(1.0 ,0.5, 0.05, 0.01, 0.001)),
+    #Side bar
+    sidebarPanel(
+      width=4,
+      
+      #Pvalue cut off 
+      selectInput(
+        "pvaluePg6", 
+        "Select adjusted P value cutoff for following plots", 
+        choices=c(1.0 ,0.5, 0.05, 0.01, 0.001)
+      ),
       
       uiOutput('leftbar_gene_plots')
-                
     ), 
     
-    mainPanel(width=6,
-             
+    #main panel
+    mainPanel(
+      width=6,
       uiOutput('gene_count_search')
-             
     ), 
     
-    sidebarPanel(width=2,
-                
+    #side panel
+    sidebarPanel(
+      width=2,
       uiOutput("gene_name_list")
-                
     )
-  )
+  
+  )#fluid page
 ), 
-# Volcano Plot____________________________________________________________#----
-tabPanel("Volcano Plot",
+#Volcano Plot tab 6 ----
+tabPanel(
+  "Volcano Plot",
+  
   fluidPage(
   
-    sidebarPanel(width=3,
-    
-     sliderInput('volcano_cutoffs', 
-                 'Cut of values for diffrential expression (verticle lines on Volcano Plot)', 
-                 min=-12, max=12,step=0.01, value = c(-1, 1), width='100%'),
+    #side bar 
+    sidebarPanel(
+      width=3,
+      
+      #diff expression cutoffs
+      sliderInput(
+        'volcano_cutoffs', 
+        'Cut of values for diffrential expression (verticle lines on Volcano Plot)', 
+        min = -12, 
+        max = 12,
+        step = 0.01, 
+        value = c(-1, 1), 
+        width = '100%'
+      ),
      
-     selectInput("pvaluePg7", "Select adjusted P value cutoff for following plot", 
-                 choices=c(1.0 ,0.5, 0.05, 0.01, 0.001), selected=0.05),
+     #P value cut off
+     selectInput(
+        "pvaluePg7", 
+        "Select adjusted P value cutoff for following plot", 
+        choices = c(1.0 ,0.5, 0.05, 0.01, 0.001), 
+        selected = 0.05
+      ),
      
-     sliderInput('volcano_pop', 
-                 'Change the population of the Volcano Plot', 
-                 min=0, max=1, value = 0.3, width='100%', ticks=FALSE),
+     #Volcano Population
+      sliderInput(
+        'volcano_pop', 
+        'Change the # of data points', 
+        min = 0, 
+        max = 1, 
+        value = 0.9, 
+        width = '100%', 
+        ticks = FALSE
+      ),
      
-     sliderInput('volcano_lab_density', 
-                 'Change the label density', 
-                 min=0, max=1, value = 0.3, width='100%', ticks=FALSE),
+      #Label density
+      sliderInput(
+        'volcano_lab_density', 
+        'Change # of points labeled', 
+        min = 0, 
+        max = 1, 
+        value = 0.3, 
+        width = '100%', 
+        ticks = FALSE
+      ),
      
-     textInput('volc_search',
-               'Genes to search/highlight (can be comma seperated list)',
-               value=NULL),
-                 
-                 
+     #Searched genes
+      textInput(
+        'volc_search',
+        'Genes to search/highlight (can be comma seperated list)',
+        value = NULL
+      ),
+     
+      #Plot labels
       textInput('title_volc_plot', 'Title', value = 'Gene Expression'),
       textInput('subtitle_volc_plot', 'Sub Title', value = ''),
-      textAreaInput('caption_volc_plot', 'Caption', value = '', width=200, rows=3)         
+      textAreaInput('caption_volc_plot', 'Caption', value = '', width = 200, rows = 3)         
     
     ),
     
-    mainPanel(width=9,
-      
+    #main panel
+    mainPanel(
+      width = 9,
       uiOutput('volcano_plot_ui')
-    
     ), 
     
-  ) 
+  )#fluid page
 )
-#----
-              ) #Tabset 1
-            )
-          )
-        )
-      )
-    ),
+#Page 2 Closing brackets ----
+          ) #Tabset 1
+        ) #Div
+      ) #Hidden
+    ) #Main panel below button
+  ) #High level fluid page
+), #High level tab panel
 
-# Page 3__________________________________________________________________#----
-  tabPanel("Pathway Analysis",
-    fluidPage(
-        
-      fluidRow(
-        column(1,
-           div(
-             actionButton('reload_app', 
-                          'Reload Application',
-                          style = "background-color: #FF6F61; color: #FF6F61; border-color: #FF6F61;")
-           )
-        ),
-        div(id="pathfinder_option_buttons",
-          column(7, offset = 1,
-            fluidRow(
-              column(4,
-                actionButton('Run_pathfinder', 'Continue Experiment With Pathway Analysis',
-                             style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
-                             ),
-              ),
-              column(3, offset = 1,
-                actionButton('review_pathfinder_new_data', 'Review A Pathway Analysis Experiment')
-              )
-            )
-          )
-        )
+#______Navigation page 3 "Pathway Analysis"______ ----
+tabPanel("Pathway Analysis",
+
+  fluidPage(
+
+#Page 3 Functional button row ----
+
+#Top row of buttons [ reload, run, old exp, downloadZip ]
+fluidRow(
+  
+  #Reload application
+  column(
+    width = 1, 
+    div(reloadApplication())
+  ),
+  
+  div(
+    id = "pathfinder_option_buttons",
+    column(
+      width = 2,
+      offset = 1,
+      actionButton(
+        'Run_pathfinder', 
+        'Continue Experiment With Pathway Analysis',
+        style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
       ),
-# Tabset 2 Pathway Analysis ________________________________#   
-      br(),
-      mainPanel(width = 12,
-        
-        uiOutput('about_pathfinder'),        
-                
-        hidden(
-          div(id="TabSet2_Pathway_Analysis",
-            tabsetPanel(
+    ),
+    
+    column(
+      width = 2, 
+      offset = 1,
+      actionButton(
+        'review_pathfinder_new_data', 
+        'Review A Pathway Analysis Experiment'
+      )
+    )
+  ),
+  
+  #Download zip file of saved files
+  column(
+    width = 1,
+    offset = 1,
+    downloadZipButton()
+  )
+  
+),
 
-#TABS
-# Preview_________________________________________________________________#----
-tabPanel("Pathway Analysis Table",
+#Page 3 Main panel set up ----  
+
+br(),
+
+mainPanel(
+  width = 12,
+
+#Page 3 HTML Info Page ( pre data only ) ----
+
+uiOutput('about_pathfinder'), #HTML Info Page 
+
+#Page 3 Bulk TabSet setup ----
+
+hidden( #Start hidden
+  
+  div(
+    id = "TabSet2_Pathway_Analysis",
+    
+    tabsetPanel(
+      id = "TabSet2",
+
+#Preview Experiment tab 1 ----
+tabPanel(
+  "Pathway Analysis Table",
+
   fluidPage(
     mainPanel(
-      
       uiOutput('pathfinderPreview')
-      
     )
   )
+  
 ),
-# Pathway Enrichment Plot_________________________________________________#----
-tabPanel("Term Enrichment",
+#Pathway Enrichment Plot tab 2 ----
+tabPanel(
+  "Term Enrichment",
+  
   fluidPage(
-     
+    
+    #Slider for number of clusters included 
     uiOutput('enrichment_clusters_shown'),
     
-    sidebarPanel(width = 3,
-                    
-      textInput('enrichment_genes',
-                'Genes to include in the enrichment chart',
-                value=NULL),
+    #sidebar
+    sidebarPanel(
+      width = 3,
       
-      textInput('enrichment_paths',
-                'Pathway terms to be included in the enrichment chart',
-                value=NULL),
+      #genes to include
+      textInput(
+        'enrichment_genes',
+        'Genes to include in the enrichment chart',
+        value = NULL
+      ),
       
-      textInput('enrichment_clusters',
-                'Specific clusters to view in the enrichment chart',
-                value=NULL),
+      #Pathways to include
+      textInput(
+        'enrichment_paths',
+        'Pathway terms to be included in the enrichment chart',
+        value = NULL
+      ),
       
+      #search specific clusters
+      textInput(
+        'enrichment_clusters',
+        'Specific clusters to view in the enrichment chart',
+        value = NULL
+      ),
+      
+      #A list of all the pathways
       uiOutput('pathwaysDT9'),
       
+      #A list of all the genes
       uiOutput('genes_in_paths_DT9')
-                    
     ), 
-       
-    mainPanel(width = 9,
-             
-      uiOutput('enrichmentUI')
-             
-    )
-  )
-), 
-# Heatmaps________________________________________________________________#----
-tabPanel("Term Gene Heatmap",
-  fluidPage(
-  
-    sidebarPanel(width = 3,
     
+    #main panel
+    mainPanel(
+      width = 9,
+      uiOutput('enrichmentUI')
+    )
+    
+  )#fluid page
+), 
+#Heatmaps tab 3 ----
+tabPanel(
+  "Term Gene Heatmap",
+  
+  fluidPage(
+    
+    #side bar
+    sidebarPanel(
+      width = 3,
+      
+      #link to open interactive plotly
       uiOutput('open_in_new_tab10'), 
       
-      textInput('pathway_heatmap_genes',
-      'Genes to include in the heatmap chart',
-      value=NULL),
+      #search for genes text box
+      textInput(
+        'pathway_heatmap_genes',
+        'Genes to include in the heatmap chart',
+        value = NULL
+      ),
       
-      textInput('heatmap_paths',
-      'Pathway terms to be included in the heatmap chart',
-      value=NULL),
+      #search for pathways text box
+      textInput(
+        'heatmap_paths',
+        'Pathway terms to be included in the heatmap chart',
+        value = NULL
+      ),
       
+      #A table of all pathways
       uiOutput('pathwaysDT10'),
       
+      #A table of all genes
       uiOutput('genes_in_paths_DT10')
-    
     ),
     
-    mainPanel(width = 9,
-    
+    #main panel
+    mainPanel(
+      width = 9,
       uiOutput('pathway_heatmap')
-    
     )
-  )
+    
+  )#fluid page
 ),
-# Case Map________________________________________________________________#----
-tabPanel("Case vs. Control",
+#Case Map tab 4 ----
+tabPanel(
+  "Case vs. Control",
+  
   fluidPage(
     
+    #a list of all samples to choose whch ones are part of the case group
     uiOutput('cases_select_box'),
     
-    sidebarPanel(width = 4,
+    #side bar
+    sidebarPanel(
+      width = 4,
       
-      checkboxInput('repOnly', "Representative pathways only", value = TRUE),
+      #A check box to decide if only representetive pathways are used
+      checkboxInput(
+        'repOnly', 
+        "Representative pathways only", 
+        value = TRUE
+      ),
       
+      # a table with the meta data file for reference
       uiOutput('sample_conditions_PreviewTable11')
-              
     ),
     
-    mainPanel(width = 8,
-         
+    #main panel
+    mainPanel(
+      width = 8,
       uiOutput('case_plot_ui')
-    
     )
-  )
+    
+  )#fluid page
 ),
-# Single Pathway heatmap__________________________________________________#----
-tabPanel("Single Pathway vs. Samples",
+#Single Pathway heatmap tab 5 ----
+tabPanel(
+  "Single Pathway vs. Samples",
+  
   fluidPage(
-   
-    sidebarPanel(width = 4,
-
-      textInput('Single_pathway_plot_search', 
-                'Pathway to visualize', 
-                value = ""),
+    
+    #side bar
+    sidebarPanel(
+      width = 4,
       
-      numericInput('Single_pathway_plot_num_points', 
-                   'Number of genes to visualize (priority to lowest pvals',
-                   value = 40,
-                   min = 10)
+      #The pathway to visualze text input
+      textInput(
+        'Single_pathway_plot_search', 
+        'Pathway to visualize', 
+        value = ""
+      ),
       
+      #The number of genes for that pathway to show
+      numericInput(
+        'Single_pathway_plot_num_points', 
+        'Number of genes to visualize (priority to lowest pvals',
+        value = 40,
+        min = 10
+      )
     ),
     
-    mainPanel(width = 8,
-              
+    #main panel
+    mainPanel(
+      width = 8,
       uiOutput('Single_pathway_plot_ui')
-      
     )
-  )
+    
+  ) #fluid page
 )
-#----       
-            ) #Tabset 2
-          )
-        )
-      )
-    )
-  )
+#Page 3 Closing brackets ----       
+          ) #Tabset 2
+        ) #Div
+      ) #Hidden
+    ) #Main Panel
+  ) #High level fluid page
+) #High level tab panel
 
-
+#High level tab panel closing ----
   )#End of tabPanel list
+
+#UI tag list closing ----
 )#End of tag list ui
 
 

@@ -283,7 +283,7 @@ server <- function(input, output, session) {
       #_____________________________________________________________
       ddsc <- DESeqDataSetFromMatrix(countData = round(countdata),
                                      colData = metadata,
-                                     design = ~sex)#des_formula)
+                                     design = des_formula)
       print(ddsc)
       
       showModal(modalDialog("Running DESeq...", footer = NULL))

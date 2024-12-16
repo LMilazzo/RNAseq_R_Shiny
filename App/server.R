@@ -276,11 +276,15 @@ server <- function(input, output, session) {
     
     tryCatch({
       
+      print(metadata)
+      print(class(metadata[,1]))
+      
       #         CREATE THE DESeq DATA SET   
       #_____________________________________________________________
       ddsc <- DESeqDataSetFromMatrix(countData = round(countdata),
                                      colData = metadata,
-                                     design = des_formula)
+                                     design = ~sex)#des_formula)
+      print(ddsc)
       
       showModal(modalDialog("Running DESeq...", footer = NULL))
       
@@ -290,7 +294,7 @@ server <- function(input, output, session) {
       #_____________________________________________________________
       contrast_list <- list()
       #Make options
-      for (col_name in colnames(colData(ddsc))) {
+      for (col_name in intersect(colnames(colData(ddsc)), all.vars(design(ddsc))) ){
         levels <- levels(colData(ddsc)[[col_name]])
         combinations <- combn(levels, 2, simplify = FALSE)
         for (combo in combinations) {
@@ -781,16 +785,18 @@ server <- function(input, output, session) {
       
       # Validate file name and save plot
       if (!is.null(input$save_plot_name) && input$save_plot_name != "") {
+        
         ggsave(
           paste0(input$save_plot_name, ".pdf"), 
           path = "SavedFiles",
           plot = toplot, 
           height = h.inches, 
           width = w.inches, 
-          units = "in", 
+          units = "cm", 
           dpi = 230,
           limitsize = FALSE
         )
+        
         showNotification("Plot saved successfully!", type = "message")
       } else {
         showNotification("Please provide a valid file name", type = "error")

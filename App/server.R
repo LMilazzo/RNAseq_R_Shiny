@@ -168,7 +168,7 @@ server <- function(input, output, session) {
       
     }
     
-    # UI ADDING A INTERACTION SELECTION ELEMNT OF EACH INTERACTION NEEDED
+    # UI ADDING A INTERACTION SELECTION ELEMENT OF EACH INTERACTION NEEDED
     #___________________________________________________________________
     output$inter_space <- renderUI({
       
@@ -202,11 +202,10 @@ server <- function(input, output, session) {
         for (j in 1:INT_COUNTER) {
           var1 <- input[[paste0("interaction_", j, "_a")]]
           var2 <- input[[paste0("interaction_", j, "_b")]]
-          
           # If both variables for the interaction are selected, add the interaction term
           if (!is.null(var1) && !is.null(var2)) {
             interaction_term <- paste(var1, var2, sep = ":")
-            design_part <- c(design_parts, interaction_term)
+            design_parts <- c(design_parts, interaction_term)
           }
           
         }
@@ -215,7 +214,6 @@ server <- function(input, output, session) {
       #     FORMULATE A STRING OF ALL DESIGN PARTS SEP BY +
       #_______________________________________________________
       design_formula <- paste(design_parts, collapse = " + ")
-      
       return(design_formula)
       
     }
@@ -232,8 +230,8 @@ server <- function(input, output, session) {
       RCV.INT_COUNTER(RCV.INT_COUNTER() + 1)
     })
     observeEvent(input$mininter, {
-      if(RCV.INT_COUNTER > 0){
-        RCV.INT_COUNTER(RCV.INT_COUNTER - 1)
+      if(RCV.INT_COUNTER() > 0){
+        RCV.INT_COUNTER(RCV.INT_COUNTER() - 1)
       }
     })
     
@@ -774,7 +772,8 @@ server <- function(input, output, session) {
     showModal(
       modalDialog(
         textInput("save_plot_name", "File Name"),
-        footer = actionButton(eventID, "Save")
+        footer = actionButton(eventID, "Save"),
+        easyClose = TRUE
       )
     )
     
@@ -1219,7 +1218,7 @@ server <- function(input, output, session) {
       div(
         checkboxGroupInput('pca_cond', 'Meta data conditions to view', 
                         choices=colnames(meta_data),
-                        selected=colnames(meta_data),
+                        selected=head(colnames(meta_data),3),
                         inline=FALSE)
       )
     })
@@ -1232,6 +1231,7 @@ server <- function(input, output, session) {
       #LOCALIZE VARIABLES
       counts <- RCV.VST_COUNTS()
       meta_data <- RCV.META_DATA()
+      corr_anns <- input$corr_annotations
       
       #ASSERT NEEDED VARIABLES
       if(is.null(counts)){return()}
@@ -1254,25 +1254,36 @@ server <- function(input, output, session) {
       
       ann_colors <- list()
       
-      for(i in colnames(meta_data)){
-        add <- setNames(list(generate_palette(meta_data[[i]])), i)
-        ann_colors <- c(ann_colors, add)
+      for(i in corr_anns){
+        if(nlevels(meta_data[[i]]) > 2){
+          add <- setNames(list(generate_palette(meta_data[[i]], base_colors = c("cadetblue", "white", "indianred"))), i)
+          ann_colors <- c(ann_colors, add)
+        }else{
+          add <- setNames(list(generate_palette(meta_data[[i]])), i)
+          ann_colors <- c(ann_colors, add)
+        }
       }
-
-      p <- pheatmap(vst_cor, 
-               angle_col = "45", 
-               main = input$title_heatmap_plot, 
-               annotation_row = meta_data,
-               annotation_colors = ann_colors,
-               fontsize = 20,
-               cellwidth = 650 / nrow(vst_cor),
-               cellheight = 650 / nrow(vst_cor)
+      
+      toAnnotate <- meta_data %>% select(all_of(head(corr_anns, 5))) 
+      ann_colors <- head(ann_colors, 5)
+      
+      p <- pheatmap(
+              vst_cor, 
+              angle_col = "45", 
+              main = input$title_heatmap_plot, 
+              annotation_row = if (nrow(toAnnotate) > 0 && ncol(toAnnotate) > 0) 
+                toAnnotate else NA,
+              annotation_colors = if (nrow(toAnnotate) > 0 && ncol(toAnnotate) > 0) 
+                ann_colors else NA,
+              fontsize = 20,
+              cellwidth = 650 / nrow(vst_cor),
+              cellheight = 650 / nrow(vst_cor)
             )
       
-      output$heatmap_plot_1 <- renderPlot({p})
+      output$heatmap_plot_1 <- renderPlot({(p)})
       
       #RENDER UI
-      p.out <- plotOutput('heatmap_plot_1', height = "850px", width = "100%")
+      p.out <- plotOutput('heatmap_plot_1', height = "1200px", width = "100%")
       
       #SAVE
       d.PLOT.CORRELATION(
@@ -1280,8 +1291,8 @@ server <- function(input, output, session) {
           output = p.out, 
           plot = p, 
           class = class(p), 
-          h = "1000px", 
-          w = "1000px"
+          h = "1200px", 
+          w = "1200px"
         )
       )
       
@@ -1290,6 +1301,18 @@ server <- function(input, output, session) {
       
     })
   
+    output$choose_annotations_ui <- renderUI({
+      
+      #LOcalize variables
+      meta_columns <- colnames(RCV.META_DATA()) 
+
+      checkboxGroupInput(
+        'corr_annotations',
+        'Max 5 Shown',
+        choices = meta_columns,
+        selected = meta_columns[[1]]
+      )
+    })
     
   #_____________GPlot____________Diff 6________________________#----
     
@@ -1401,7 +1424,7 @@ server <- function(input, output, session) {
         checkboxGroupInput('gene_count_plot_search_cond', 
                             'Meta data conditions to view, first 4 are considered with mapping order (x, color, shape, size)', 
                             choices=colnames(meta_data),
-                            selected=colnames(meta_data),
+                            selected=head(colnames(meta_data),4),
                             inline=TRUE),
         renderUI({
           

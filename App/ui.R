@@ -292,9 +292,9 @@ tabPanel(
   "Correlation Anaylsis",
   
   fluidPage(
-  
+    
     #side bar
-    sidebarPanel( 
+    sidebarPanel(
       width=2,
       HTML("<h3>Labels</h3>"),
       textInput(
@@ -302,6 +302,8 @@ tabPanel(
         'Title', 
         value = 'Sample Correlation'
       ),
+      HTML("<h4>Annotations to Include</h4>"),
+      uiOutput('choose_annotations_ui'),
       savePlotButton()
     ),
     
@@ -309,7 +311,7 @@ tabPanel(
     mainPanel(
       width = 10,     
       uiOutput('heatmap_plot_ui')
-    ),
+    )
 
   )#fluid page
 ),

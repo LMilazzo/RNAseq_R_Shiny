@@ -7,7 +7,7 @@ library(shiny)
 
 ##___________________UI FUNCTIONS________________________
 
-# Primitive function for displaying a modal that displays and error
+# Basic function that returns and displays a modal with the given message in red text
 showErrorModal <- function(message) {
   showModal(modalDialog(tags$p(style = "color: red;", message), easyClose = TRUE, footer = NULL))
 }
@@ -16,7 +16,8 @@ showErrorModal <- function(message) {
 
 #________________FILTERING FUNCTIONS___________________________
 
-# Splits a DESeq result dataset into 3 dataframes base on fold change
+# Splits a DESeq result dataset into 3 dataframes based on fold change provided
+# cut is a vector of two values the lower cutoff and the upper cutoff
 splitByExpr <- function(data, cut){
   
   lowerBound <- cut[1]
@@ -43,6 +44,8 @@ splitByExpr <- function(data, cut){
 }
 
 # Filters the raw counts upload
+# The row sum cutoff for a gene to be kept is hard coded as 10 this can and 
+# should be changed within this function
 filterCounts <- function(counts){
   
   keep <- rowSums(counts) > 10
@@ -53,8 +56,6 @@ filterCounts <- function(counts){
   
   return(counts)
 }
-
-
 
 
 #________________PLOTTING FUNTIONS___________________________
@@ -178,8 +179,6 @@ runPathfindRFunc <- function(data_source){
   })
   
 }
-
-
 
 
 #_____________FILE READING FUNCTIONS______________________________

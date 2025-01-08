@@ -1455,8 +1455,8 @@ server <- function(input, output, session) {
                 output = p.out, 
                 plot = plot, 
                 class = class(plot), 
-                h = "600px", 
-                w = "600px"
+                h = "800px", 
+                w = "800px"
               )
             )
 
@@ -1666,7 +1666,7 @@ server <- function(input, output, session) {
       )
       
       #print
-      div(p.out)
+      p.out
       
     })
     

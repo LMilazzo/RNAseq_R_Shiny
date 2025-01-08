@@ -22,6 +22,7 @@ downloadZipButton <- function(){
 
 
 #Saves a plot on the current page
+#with prebuilt dimensions outlined in the server file 
 savePlotButton <- function(){
   
   return(actionButton("save", "SAVE"))

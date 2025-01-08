@@ -1,31 +1,37 @@
 # List of required packages
 packages <- c("shiny", "shinythemes", "DT", "dplyr", "readr", 
-              "ggplot2", "ggplotify", "patchwork", "matrixStats", "circlize", 
-              "colourpicker", "ggbeeswarm", "ggrepel", 
+              "ggplot2", "ggplotify", "pheatmap", "ggbeeswarm", "ggrepel", 
               "pathfindR", "tidyr", "shinyjs", "plotly", 
-              "htmlwidgets", "png", "leaflet", "devtools", "shiny")
+              "htmlwidgets", "grid", "zip", "shinyFiles")
 
 # Function to check and install missing packages
 install_if_missing <- function(pkg) {
-  if (!requireNamespace(pkg, quietly = FALSE)) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
     install.packages(pkg, dependencies = TRUE)
   }
 }
 
 invisible(lapply(packages, install_if_missing))
 
-if (!requireNamespace("BiocManager", quietly = FALSE)){
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
   install.packages("BiocManager")
 }
 
-bioc_packages <- c("DESeq2", "ComplexHeatmap", "SummarizedExperiment")
+# List of Bioconductor packages
+bioc_packages <- c("DESeq2", "SummarizedExperiment")
+
+# Function to check and install missing Bioconductor packages
 for (pkg in bioc_packages) {
-  if (!requireNamespace(pkg, quietly = FALSE)) {
+  if (!requireNamespace(pkg, quietly = TRUE)) {
     BiocManager::install(pkg)
   }
 }
 
-if (!requireNamespace("BioVis", quietly = FALSE)){
+# Install BioVis from GitHub if not already installed
+if (!requireNamespace("BioVis", quietly = TRUE)) {
+  if (!requireNamespace("devtools", quietly = TRUE)) {
+    install.packages("devtools")
+  }
   devtools::install_github("LMilazzo/BioVis")
 }
 

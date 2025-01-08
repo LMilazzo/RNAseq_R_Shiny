@@ -1,30 +1,31 @@
 
-runLibs <- function(){
+runLibs <- function() {
+  # For shiny running
   library(shiny)
   library(shinythemes)
+  library(shinyjs)
+  library(shinyFiles)
   library(DT)
+  library(htmlwidgets)
+  
+  # For data
   library(dplyr)
+  library(tidyr)
   library(readr)
   library(DESeq2)
-  library(ggplot2)
-  library(ggplotify)
-  library(patchwork)
-  library(matrixStats)
   library(SummarizedExperiment)
-  library(circlize)
-  library(pheatmap)
-  library(colourpicker)
-  library(ggbeeswarm)
-  library(ggrepel)
   library(BioVis)
   library(pathfindR)
-  library(tidyr)
-  library(shinyjs)
+  
+  # For plotting
+  library(ggplot2)
+  library(ggplotify)
+  library(pheatmap)
+  library(ggbeeswarm)
+  library(ggrepel)
   library(plotly)
-  library(htmlwidgets)
-  library(png)
-  library(leaflet)
   library(grid)
-  library(shinyFiles)
+  
+  # Additional
   library(zip)
 }

@@ -589,6 +589,13 @@ tabPanel(
         value = NULL
       ),
       
+      #Title for the plot
+      textInput(
+        'title_pathwayVgene_heatmap',
+        'Plot Title',
+        value = ''
+      ),
+      
       #A table of all pathways
       uiOutput('pathwaysDT10'),
       
@@ -622,6 +629,13 @@ tabPanel(
         'repOnly', 
         "Representative pathways only", 
         value = TRUE
+      ),
+      
+      #plot title
+      textInput(
+        'case_plot_title',
+        'Plot Title',
+        ''
       ),
       
       # a table with the meta data file for reference
@@ -662,6 +676,9 @@ tabPanel(
         value = 40,
         min = 10
       ),
+      
+      HTML("<h4>Annotations to Include</h4>"),
+      uiOutput('choose_annotations_ui_p'),
       
       savePlotButton()
     ),

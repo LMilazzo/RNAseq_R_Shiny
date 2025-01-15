@@ -128,11 +128,11 @@ server <- function(input, output, session) {
     
     #               ADJUST UI
     #_____________________________________________________
-    hide('Page1_Upload_Options')
-    show('run_DESeq2')
-    show('pg1table2')
-    show('pg1table1')
-    hide('about_DESeq2')
+    shinyjs::hide('Page1_Upload_Options')
+    shinyjs::show('run_DESeq2')
+    shinyjs::show('pg1table2')
+    shinyjs::show('pg1table1')
+    shinyjs::hide('about_DESeq2')
     
   })
   
@@ -325,9 +325,9 @@ server <- function(input, output, session) {
       
       #           UPDATE UI
       # _______________________________
-      hide("run_DESeq2")
-      hide('preRun_Data_Preview')
-      show("TabSet1_Diffrential_Expression_Analysis")
+      shinyjs::hide("run_DESeq2")
+      shinyjs::hide('preRun_Data_Preview')
+      shinyjs::show("TabSet1_Diffrential_Expression_Analysis")
         
         
     }, error = function(e) {
@@ -421,12 +421,12 @@ server <- function(input, output, session) {
     
     #             UPDATE UI
     #____________________________________________
-    hide('Page1_Upload_Options')
-    hide('preRun_Data_Preview')
-    show('pg1table2')
-    show('pg1table1')
-    show("TabSet1_Diffrential_Expression_Analysis")
-    hide('about_DESeq2')
+    shinyjs::hide('Page1_Upload_Options')
+    shinyjs::hide('preRun_Data_Preview')
+    shinyjs::show('pg1table2')
+    shinyjs::show('pg1table1')
+    shinyjs::show("TabSet1_Diffrential_Expression_Analysis")
+    shinyjs::hide('about_DESeq2')
     
   })
   
@@ -504,9 +504,9 @@ server <- function(input, output, session) {
       RCV.PATHWAY_META_DATA(md)
       
       #ALTER UI
-      show("TabSet2_Pathway_Analysis")
-      hide('pathfinder_option_buttons')
-      hide('about_pathfinder')
+      shinyjs::show("TabSet2_Pathway_Analysis")
+      shinyjs::hide('pathfinder_option_buttons')
+      shinyjs::hide('about_pathfinder')
     
     }
       
@@ -553,9 +553,9 @@ server <- function(input, output, session) {
     RCV.PATHWAY_RESULTS(res)
     RCV.PATHWAY_META_DATA(meta_data)
     
-    show("TabSet2_Pathway_Analysis")
-    hide('pathfinder_option_buttons')
-    hide('about_pathfinder')
+    shinyjs::show("TabSet2_Pathway_Analysis")
+    shinyjs::hide('pathfinder_option_buttons')
+    shinyjs::hide('about_pathfinder')
     
   })
   
@@ -687,8 +687,8 @@ server <- function(input, output, session) {
     }
     
     #ALTER UI
-    hide('about_pathfinder')
-    show('TabSet2_Pathway_Analysis')
+    shinyjs::hide('about_pathfinder')
+    shinyjs::show('TabSet2_Pathway_Analysis')
     
   })
 #----
@@ -1907,19 +1907,21 @@ server <- function(input, output, session) {
         theme(
           axis.text.y = element_text(size = 15),
           axis.text.x = element_text(size = 15),
-          legend.text = element_text(size = 10),
-          legend.title = element_text(size = 10)
+          legend.text = element_text(size = 20),
+          legend.title = element_text(size = 20),
+          plot.title = element_text(size = 20)
         ) +
+        labs(title = input$title_pathwayVgene_heatmap) + 
         scale_x_discrete(position = 'top')
       
       #CREATE PLOT OUTPUT
       output$plot_heatmap_10 <- renderPlot({
-        edits
+        plotlie
       }) 
       
       #UI OUTPUT
       p.out <- plotOutput('plot_heatmap_10', 
-                 width = paste0(plot[[2]]$x$layout$width + 200, "px"), 
+                 width = 'auto', #paste0(plot[[2]]$x$layout$width + 200, "px"), 
                  height = paste0(plot[[2]]$x$layout$height + 275, "px"))
       
       #save
@@ -2029,7 +2031,10 @@ server <- function(input, output, session) {
       w <- plotdata[[3]]
       
       #RENDER PLOT
-      output$case_map_plot <- renderPlot({plotdata[[1]]})
+      output$case_map_plot <- renderPlot({
+        plotdata[[1]] + labs(title = input$case_plot_title) + 
+          theme(plot.title = element_text(size =20, margin = margin(0,0,10,0)))
+      })
       
       p.out <- plotOutput('case_map_plot', height = h, width = w)
       
@@ -2060,6 +2065,8 @@ server <- function(input, output, session) {
       p.ab <- RCV.PATHWAY_ABUNDANCE()
       norm <- RCV.NORMALIZED_COUNTS()
       deg.res <- RCV.RESULTS_DDSC()
+      annotations <- input$path_heatmap_annotations
+      meta_data <- RCV.PATHWAY_META_DATA()
       
       #     REQUIRE DATA
       #__________________________
@@ -2129,6 +2136,37 @@ server <- function(input, output, session) {
       w <- paste0(w, "px")
       h <- paste0(h, "px")
       
+      #   SET UP ANNOTATIONS
+      #_____________________________
+      generate_palette <- function(factor_levels, base_colors = c("cornsilk3", "orchid")) {
+        # Check the number of unique factor levels
+        unique_levels <- unique(factor_levels)
+        num_levels <- length(unique_levels)
+        
+        # Generate the palette using colorRampPalette
+        palette <- colorRampPalette(base_colors)(num_levels)
+        
+        # Return a named vector mapping levels to colors
+        setNames(palette, unique_levels)
+      }
+      
+      ann_colors <- list()
+      for(i in annotations){
+        if(nlevels(meta_data[[i]]) > 2){
+          add <- setNames(list(generate_palette(meta_data[[i]], base_colors = c("cadetblue", "white", "indianred"))), paste0(i, '   '))
+          ann_colors <- c(ann_colors, add)
+        }else{
+          add <- setNames(list(generate_palette(meta_data[[i]])), paste0(i, '   '))
+          ann_colors <- c(ann_colors, add)
+        }
+      }
+      
+      toAnnotate <- meta_data %>% select(all_of(head(annotations, 5)))
+      if(ncol(toAnnotate) > 0){
+        colnames(toAnnotate) <- sapply(colnames(toAnnotate), function(x) paste0(x, '   '))
+      }
+      ann_colors <- head(ann_colors, 5)
+      
       #   PLOT THE DATA
       #______________________________
       plot <- pheatmap(data, 
@@ -2136,12 +2174,16 @@ server <- function(input, output, session) {
                fontsize = 15, 
                angle_col = "45", 
                legend_breaks = c(-2, -1, 0, 1, 2), 
-               main = input$Single_pathway_plot_search)
+               main = input$Single_pathway_plot_search,
+               annotation_col = if (nrow(toAnnotate) > 0 && ncol(toAnnotate) > 0) 
+                 toAnnotate else NA,
+               annotation_colors = if (nrow(toAnnotate) > 0 && ncol(toAnnotate) > 0) 
+                 ann_colors else NA)
       
       #RENDER PLOT
       output$Single_pathway_plot <- renderPlot({plot})
       
-      p.out <- plotOutput('Single_pathway_plot', height = h, width = w)
+      p.out <- plotOutput('Single_pathway_plot', height = h, width = 'auto')
       
       #save
       p.PLOT.PATHWAY(
@@ -2159,7 +2201,18 @@ server <- function(input, output, session) {
       
     })
     
-    
+    output$choose_annotations_ui_p <- renderUI({
+      
+      #LOcalize variables
+      meta_columns <- colnames(RCV.PATHWAY_META_DATA()) 
+      
+      checkboxGroupInput(
+        'path_heatmap_annotations',
+        'Max 5 Shown',
+        choices = meta_columns,
+        selected = meta_columns[[1]]
+      )
+    })
     
 #----
 } #X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

@@ -1916,7 +1916,7 @@ server <- function(input, output, session) {
       
       #CREATE PLOT OUTPUT
       output$plot_heatmap_10 <- renderPlot({
-        plotlie
+        edits
       }) 
       
       #UI OUTPUT

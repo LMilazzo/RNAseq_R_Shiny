@@ -13,27 +13,92 @@ options(shiny.maxRequestSize=100*1024^2)  # Limits file upload size to 100 MB
 
 #CSS
 tags.css <- tags$style(HTML("             
-    /* Custom CSS for DataTable */
-    .dataTables_wrapper .dataTables_length, 
-    .dataTables_wrapper .dataTables_filter, 
-    .dataTables_wrapper .dataTables_info, 
-    .dataTables_wrapper .dataTables_paginate,
-    table.dataTable {
-      color: #ffffff;  /* Change text color */
+
+     table.dataTable {
+        background-color: #1C1E22; /* Match medium gray background */
+        border: 1px solid #677780; /* Subtle border */
+        color: white; /* Light text */
+        border-collapse: separate;
+        border-spacing: 0;
+     }
+      
+     table.dataTable thead th {
+      background-color: #273238; /* Slightly darker for the header */
+      color: #ffffff; /* White text for the header */
+      text-align: center;
+      padding: 8px;
+      font-size: 16px ;
+     }
+     
+     table.dataTable tbody td {
+      background-color: #1C1E22;
+      font-size: 14px;
+      padding: 9px ;
+     }
+    
+    table.dataTable th, table.dataTable td {
+      border: 1px solid #677780; /* Subtle inner cell borders */
+      padding: 6px; /* Comfortable padding */
     }
-    table.dataTable thead {
-      background-color: #444444; /* Change header background */
-      color: #ffffff; /* Change header text color */
+
+    .dataTables_wrapper .dataTables_filter input {
+      border: 1px solid white;
+      background-color: #4a4a4a;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 4px;
+      width: 200px;
     }
-    table.dataTable tbody {
-      background-color: #333333; /* Change body background */
+
+    .dataTables_wrapper .dataTables_length select {
+      border: 1px solid white;
+      background-color: #4a4a4a;
+      color: white;
+      padding: 5px;
+      border-radius: 4px;
     }
     
-    body {
-    -moz-transform: scale(0.8, 0.8); /* Moz-browsers */
-    zoom: 0.8; /* Other non-webkit browsers */
-    zoom: 80%; /* Webkit browsers */
+    .dataTables_wrapper .dataTables_length label {
+      color: white;
     }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+      background-color: #1C1E22;
+      color: white !important;
+      border: 1px solid white;
+      font-size: 14px; /* Adjust text size */
+      padding: 5px 8px;
+      margin: 2px;
+      border-radius: 4px;
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+      background-color: #2aa4eb;
+      color: black;
+      font-weight: bold;
+    }
+    
+    .dataTables_wrapper .dataTables_info {
+      color: white;
+    }
+
+    .dataTables_wrapper .dataTables_paginate .previous 
+    .dataTables_wrapper .dataTables_paginate .next {
+      font-size: 14px;
+      color: white !important; 
+    }
+      
+    .dataTables_wrapper .dataTables_filter label {
+      font-size: 14px;
+      color: white;
+    }
+      
+    body {
+      -moz-transform: scale(0.8, 0.8); /* Moz-browsers */
+      zoom: 0.8; /* Other non-webkit browsers */
+      zoom: 80%; /* Webkit browsers */
+    }
+    
   "))
 
 #App UI tag List ----
@@ -51,7 +116,7 @@ ui <-
 navbarPage(
   id = "App",
   title = "", 
-  selected = "Diffrentially Expressed Genes", #Initial child page
+  selected = "Differential Gene Expression", #Initial child page
   theme = shinytheme("slate"),
   
 #______Navigation page 1 "Help"______ ----
@@ -59,18 +124,26 @@ navbarPage(
 tabPanel(
   title = "Help",
   
-  fluidPage(
+  tabsetPanel(
+    id = "TabSet_Help",
     
-    plotlyOutput('interactive_image')
-  
-  )
+    tabPanel(
+      title = "Workflow Map",
+      plotlyOutput("interactive_flowchart")
+    ),
+    
+    tabPanel(
+      title = "File Usage Documentation",
+      uiOutput('file_usage_documentation')
+    )
      
+  )
 ),
     
 
 #______Navigation page 2 "Differential Expressed Genes"_____ ----
 
-tabPanel("Diffrentially Expressed Genes",
+tabPanel("Differential Gene Expression",
 
   fluidPage(
 
@@ -94,7 +167,7 @@ fluidRow(
       actionButton(
         'start_new_experiment', 
         'Start New Experiment',
-        style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
+        style = "background-color: #4CAF50 ; color: black; border-color: white; background-image: none;"
       )
     ),
     column(
@@ -102,7 +175,8 @@ fluidRow(
       offset = 1,
       actionButton(
         'start_old_experiment', 
-        'Review A Previous Experiment'
+        'Review A Previous Experiment',
+        style = "background-color: #007bff ; color: black; border-color: white; background-image: none;"
       )
     )
   ),
@@ -115,7 +189,7 @@ fluidRow(
       actionButton(
         "run_DESeq2", 
         "Run Differential Expression",
-        style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
+        style = "background-color: #4CAF50; color: black; border-color: white; background-image: none;"
       )
     )
   ),
@@ -337,7 +411,7 @@ tabPanel(
     
     #main panel
     mainPanel(
-      width=6,
+      width=5,
       uiOutput('gene_count_search'),
       br(),
       savePlotButton()
@@ -345,7 +419,7 @@ tabPanel(
     
     #side panel
     sidebarPanel(
-      width=2,
+      width=3,
       uiOutput("gene_name_list")
     )
   
@@ -456,7 +530,7 @@ fluidRow(
       actionButton(
         'Run_pathfinder', 
         'Continue Experiment With Pathway Analysis',
-        style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;"
+        style = "background-color: #4CAF50; color: black; border-color: white; background-image: none;"
       ),
     ),
     
@@ -465,7 +539,8 @@ fluidRow(
       offset = 1,
       actionButton(
         'review_pathfinder_new_data', 
-        'Review A Pathway Analysis Experiment'
+        'Review A Pathway Analysis Experiment',
+        style = "background-color: #007bff; color: black; border-color: white; background-image: none;"
       )
     )
   )
@@ -512,12 +587,11 @@ tabPanel(
     #Slider for number of clusters included 
     fluidRow(
       column(
-        width = 4,
+        width = 2,
         uiOutput('enrichment_clusters_shown')
       ),
       column(
         width = 1, 
-        offset = 2,
         savePlotButton()
       )
     ),

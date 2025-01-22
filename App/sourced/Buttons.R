@@ -5,7 +5,7 @@ reloadApplication <- function(){
     actionButton(
       'reload_app', 
       'Reload Application', 
-       style = "background-color: #FF6F61; color: #FF6F61; border-color: #FF6F61;"
+       style = "background-color: #FF6F61; color: black; border-color: white; background-image: none;"
     )  
   )
 }
@@ -15,7 +15,8 @@ downloadZipButton <- function(){
   return(
     shiny::downloadButton(
       outputId = 'downloadZip', 
-      label = 'Download Saved files'
+      label = 'Download Saved files',
+      style = " border-color: #4CAF50; background-image: none;"
     )
   )
 }
@@ -25,6 +26,6 @@ downloadZipButton <- function(){
 #with prebuilt dimensions outlined in the server file 
 savePlotButton <- function(){
   
-  return(actionButton("save", "SAVE"))
+  return(actionButton("save", "SAVE", style = "background-color: #4CAF50 ; color: black; border-color: white; background-image: none;"))
   
 }

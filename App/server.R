@@ -247,7 +247,7 @@ server <- function(input, output, session) {
         actionButton('mininter', "Remove interaction"),
       ),
       footer = tagList(actionButton('design_submit', "Run", 
-      style = "background-color: #4CAF50; color: #4CAF50; border-color: #4CAF50;")), 
+      style = "background-color: #4CAF50; color: black; border-color: white; background-image: none;")), 
       easyClose = TRUE
     ))
   
@@ -581,7 +581,7 @@ server <- function(input, output, session) {
     #UI DISPLAY 2 THERES ALREADY METADATA OPTIONAL TO UPLOAD A NEW ONE
     else{
       
-      output$tempTableXX <- renderTable({old_md}, rownames  = TRUE)
+      output$tempTableXX <- renderDT({old_md}, rownames  = TRUE)
       
       metadata_input <- div(
           h5("Sample Conditions Table"),
@@ -601,12 +601,18 @@ server <- function(input, output, session) {
       modalDialog(
         div( 
         
-          HTML('<p>(csv or tsv) containing (ID,	Term_Description,	Fold_Enrichment, occurrence, support,	lowest_p,	highest_p,	non_Signif_Snw_Genes,	Up_regulated,	Down_regulated,	all_pathway_genes,	num_genes_in_path,	Cluster, Status,)</p>'),
-          HTML('<br>This is the standard output from a pathfindR clustered experiment.'),
-          fileInput('pathfinder_output_file', 'Pathway Information'),
+          p('Pathway Analysis Results'),
+          HTML('<p>This is the standard output from a pathfindR clustered experiment.</p>'),
+          p("Accepted File Types:  .csv   .tsv "),
+          HTML('<p>Must contain all following columns:</p>'),
+          HTML('<p>(ID,	Term_Description,	Fold_Enrichment, occurrence, support,	lowest_p,	highest_p,	non_Signif_Snw_Genes,	Up_regulated,	Down_regulated,	all_pathway_genes,	num_genes_in_path,	Cluster, Status)</p>'),
+          fileInput('pathfinder_output_file', 'Pathway Analysis Results'),
         
-          HTML('<p>Normalized count data includes (gene_name) and samples where each sample name starts with "."</p>'),
-          fileInput('pathfinder_output_counts', 'Abundance Data'),
+          HTML('<p>Normalized Gene Counts'),
+          p("Accepted File Types:  .csv   .tsv "),
+          HTML('<p>Format: (gene_name, samples...)</p>'),
+          p('All sample column headers should start with a "." character to be recognized'),
+          fileInput('pathfinder_output_counts', 'Gene Counts'),
           
           metadata_input
           
@@ -829,7 +835,7 @@ server <- function(input, output, session) {
   #Help Page
   #_______________________Interactive Flow Map_____________________#----
   
-    output$interactive_image <- renderPlotly({
+    output$interactive_flowchart <- renderPlotly({
       
       img_width = 1600 
       img_height = 900 
@@ -901,6 +907,11 @@ server <- function(input, output, session) {
         )
       fig
     })
+  #_______________________File Help Page_____________________#----
+    output$file_usage_documentation <- renderUI({
+      includeHTML('www/FileUsageDocumentation.HTML')
+    })
+  
   #----
 
   #Page1 pretabSET----
@@ -931,7 +942,7 @@ server <- function(input, output, session) {
       
       if(!is.null(meta_data)){ 
         
-        renderTable({meta_data}, rownames  = TRUE) 
+        renderDT({meta_data}, rownames  = TRUE) 
         
       }else{
         
@@ -986,7 +997,7 @@ server <- function(input, output, session) {
       
       if(!is.null(meta_data)){ 
         
-        renderTable({meta_data}, rownames  = TRUE) 
+        renderDT({meta_data}, rownames  = TRUE) 
         
       }else{
         
@@ -1907,9 +1918,10 @@ server <- function(input, output, session) {
         theme(
           axis.text.y = element_text(size = 15),
           axis.text.x = element_text(size = 15),
+          axis.title.x = element_text(size = 15),
           legend.text = element_text(size = 20),
           legend.title = element_text(size = 20),
-          plot.title = element_text(size = 20)
+          plot.title = element_text(size = 24, margin = margin(0,0,15,0))
         ) +
         labs(title = input$title_pathwayVgene_heatmap) + 
         scale_x_discrete(position = 'top')
@@ -1954,7 +1966,7 @@ server <- function(input, output, session) {
       
       #RENDER TABLE
       
-      renderTable({meta_data}, rownames  = TRUE) 
+      renderDT({meta_data}, rownames  = TRUE) 
       
 
     })

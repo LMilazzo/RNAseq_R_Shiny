@@ -115,7 +115,7 @@ ui <-
 
 navbarPage(
   id = "App",
-  title = "", 
+  title = "🧬", 
   selected = "Differential Gene Expression", #Initial child page
   theme = shinytheme("slate"),
   

@@ -240,7 +240,11 @@ server <- function(input, output, session) {
     showModal(modalDialog(
       div(
         p("Experimental design"),
-        renderText({RCV.DESIGN_FORMULA_STRING()}),
+        tags$div(
+          style = "border: 2px solid white; padding: 10px; border-radius: 5px;",
+          renderText({RCV.DESIGN_FORMULA_STRING()})
+        ),
+        br(),
         checkboxGroupInput('main_effects', 'Variables', choices = vars, inline = TRUE),
         uiOutput("inter_space"),
         actionButton('plusinter', "Add interaction"),

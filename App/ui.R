@@ -3,6 +3,11 @@
 source("sourced/Functions.R")
 source("sourced/LoadPackages.R")
 source("sourced/Buttons.R")
+source("sourced/UIfunctions/PrincipleComponentPlot.R")
+source("sourced/UIfunctions/CorrelationPlot.R")
+source("sourced/UIfunctions/Gplots.R")
+source("sourced/AdvancedPlotSettings.R")
+library(shinyWidgets)
 
 #Load packages
 runLibs()
@@ -328,26 +333,7 @@ tabPanel(
       uiOutput('pca_n_counts'),
       uiOutput('pca_metadata'),
       
-      HTML("<h3>Labels</h3>"),
-      
-      textInput(
-        'title_pca_plot', 
-        'Title', 
-        value = 'Principle Component Analysis of Sample Varience'
-      ),
-      textInput(
-        'subtitle_pca_plot', 
-        'Sub Title', 
-        value = 'Colored by sample traits'
-      ),
-      textAreaInput(
-        'caption_pca_plot', 
-        '', 
-        value = '', 
-        width=200, 
-        rows=3
-      ),
-      
+      advancedSettingsButton(),
       savePlotButton()
       
     ),
@@ -363,21 +349,17 @@ tabPanel(
 
 #Correlation Analysis tab 4 ----
 tabPanel(
-  "Correlation Anaylsis",
+  "Correlation Analysis",
   
   fluidPage(
     
     #side bar
     sidebarPanel(
       width=2,
-      HTML("<h3>Labels</h3>"),
-      textInput(
-        'title_heatmap_plot', 
-        'Title', 
-        value = 'Sample Correlation'
-      ),
       HTML("<h4>Annotations to Include</h4>"),
       uiOutput('choose_annotations_ui'),
+      
+      advancedSettingsButton(),
       savePlotButton()
     ),
     
@@ -395,32 +377,48 @@ tabPanel(
   
   fluidPage(
   
+    #side panel
+    # sidebarPanel(
+    #   width=2,
+    #   uiOutput("gene_name_list")
+    # ),
+    
     #Side bar
     sidebarPanel(
       width=4,
-      
-      #Pvalue cut off 
+      #Pvalue cut off
       selectInput(
-        "pvaluePg6", 
-        "Select adjusted P value cutoff for following plots", 
+        "pvaluePg6",
+        "Select adjusted P value cutoff for following plots",
         choices=c(1.0 ,0.5, 0.05, 0.01, 0.001)
       ),
-      
+
       uiOutput('leftbar_gene_plots')
     ), 
     
     #main panel
     mainPanel(
-      width=5,
-      uiOutput('gene_count_search'),
+      width=6,
+      fluidRow(
+        column(width = 3,
+          textInput(
+            "gplop_searched",
+            "Search and plot a gene", 
+            NULL
+          )
+        ),
+        column(width = 2, offset = 1,
+          br(),
+          advancedSettingsButton()
+        ),
+        column(width = 2, offset = 2,
+          br(),
+          savePlotButton()
+        )
+      ),
+      uiOutput('g_search_checkbox'),
       br(),
-      savePlotButton()
-    ), 
-    
-    #side panel
-    sidebarPanel(
-      width=3,
-      uiOutput("gene_name_list")
+      uiOutput('gene_count_search')
     )
   
   )#fluid page

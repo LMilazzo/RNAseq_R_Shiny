@@ -1,4 +1,4 @@
-#_________________________________Shiny Server__________________________________________
+ #_________________________________Shiny Server__________________________________________
 server <- function(input, output, session) {
 
   #reload app
@@ -708,6 +708,14 @@ server <- function(input, output, session) {
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 #----
 
+  #Close open devices
+  observe({
+    invalidateLater(8000, session)  # Check every second
+    if(length(dev.list()) > 0){
+      dev.off()
+    }
+  })
+  
   #Unlink temp directory on session end
   session$onSessionEnded(function() {
     # List all files in the directory
@@ -731,25 +739,26 @@ server <- function(input, output, session) {
   p.PLOT.PATHWAY <- reactiveVal(NULL)
   
   #Iterator for event 
-  i.EventID <- reactiveVal(0)
+  save.EventID <- reactiveVal(0)
   #Update temp directoru with new plot
   observeEvent(input$save,{
     
     #iterate
-    i.EventID(i.EventID() + 1)
+    save.EventID(save.EventID() + 1)
     
     #find current page
     getSection <- input$App
+   
     page <- switch(
               getSection, 
-              "Diffrentially Expressed Genes" = input$TabSet1,
+              "Differential Gene Expression" = input$TabSet1,
               "Pathway Analysis" = input$TabSet2
             )
     
     selected <- switch(
             page,
             "Principle Component Plots" =  d.PLOT.PCA(),
-            "Correlation Anaylsis" = d.PLOT.CORRELATION(),
+            "Correlation Analysis" = d.PLOT.CORRELATION(),
             "Gene Counts" = d.PLOT.GENE(),
             "Volcano Plot" = d.PLOT.VOLCANO(),
             
@@ -777,7 +786,7 @@ server <- function(input, output, session) {
     }
     
     #Formulate event ID
-    eventID <- paste0("confirm_save_", i.EventID())
+    eventID <- paste0("confirm_save_", save.EventID())
     
     showModal(
       modalDialog(
@@ -831,6 +840,258 @@ server <- function(input, output, session) {
   )
   
   
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
+#~~~~~######____________Advanced Editing______________######~~~~~#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
+
+  plotSettingsHub <- reactiveVal(
+    
+    list(
+      "d.PLOT.PCA.SET" = list(
+        "Title" = "",
+        "Caption" = "",
+        "Subtitle" = "",
+        "TSA" = 0,
+        "Width" = "auto",
+        "Height" = "auto",
+        "DefaultWidth" = 900,
+        "DefaultHeight" = 800,
+        "Aspect" = "auto"
+      ),
+      
+      "d.PLOT.CORRELATION.SET" = list(
+        "Title" = "",
+        "TSA" = 0,
+        "CellWidth" = "auto",
+        "CellHeight" = "auto",
+        "Height" = "auto",
+        "Width" = "auto",
+        "DefaultWidth" = 1200,
+        "DefaultHeight" = 1200
+      ),
+      
+      "d.PLOT.GENE.SET" = list(
+        "Title" = "",
+        "Caption" = "",
+        "Subtitle" = "",
+        "TSA" = 0,
+        "DefaultWidth" = 750,
+        "DefaultHeight" = 500,
+        "Width" = "auto",
+        "Height" = "auto",
+        "Aspect" = "auto"
+      ),
+      
+      "d.PLOT.VOLCANO.SET" = list(
+        "Title" = "",
+        "Caption" = "",
+        "Subtitle" = "",
+        "TSA" = 0,
+        "Width" = 0,
+        "Height" = 0,
+        "Aspect" = "auto"
+      ),
+      
+      "p.PLOT.ENRICHMENT.SET" = list(
+        "Title" = "",
+        "Caption" = "",
+        "Subtitle" = "",
+        "TSA" = 0,
+        "Width" = 0,
+        "Height" = 0,
+        "Aspect" = "auto"
+      ),
+      
+      "p.PLOT.LARGEMAP.SET" = list(
+        "Title" = "",
+        "Caption" = "",
+        "Subtitle" = "",
+        "TSA" = 0,
+        "Width" = 0,
+        "Height" = 0,
+        "Aspect" = "auto"
+      ),
+      
+      "p.PLOT.CASEENRICHMENT.SET" = list(
+        "Title" = "",
+        "Caption" = "",
+        "Subtitle" = "",
+        "TSA" = 0,
+        "Width" = 0,
+        "Height" = 0,
+        "Aspect" = "auto"
+      ),
+      
+      "p.PLOT.PATHWAY.SET" = list(
+        "Title" = "",
+        "Caption" = "",
+        "Subtitle" = "",
+        "TSA" = 0,
+        "Width" = 0,
+        "Height" = 0,
+        "Aspect" = "auto"
+      )
+    )
+  )
+  
+  settings.EventID <- reactiveVal(0)
+  observeEvent(input$advancedSettingsButton,{
+    
+    settings.EventID(settings.EventID() + 1)
+    
+    getSection <- input$App
+    page <- switch(
+      getSection, 
+      "Differential Gene Expression" = input$TabSet1,
+      "Pathway Analysis" = input$TabSet2
+    )
+    
+    # Map page names to the keys in plotSettingsHub
+    page_mapping <- list(
+      "Principle Component Plots" = "d.PLOT.PCA.SET",
+      "Correlation Analysis" = "d.PLOT.CORRELATION.SET",
+      "Gene Counts" = "d.PLOT.GENE.SET",
+      "Volcano Plot" = "d.PLOT.VOLCANO.SET",
+      "Term Enrichment" = "p.PLOT.ENRICHMENT.SET",
+      "Term Gene Heatmap" = "p.PLOT.LARGEMAP.SET",
+      "Case vs. Control" = "p.PLOT.CASEENRICHMENT.SET",
+      "Single Pathway vs. Samples" = "p.PLOT.PATHWAY.SET"
+    )
+    
+    # Retrieve the correct settings from plotSettingsHub using the page mapping
+    selected_key <- page_mapping[[page]]
+    if (is.null(selected_key)) {
+      return()  # If no match for the page, exit
+    }
+  
+    org_selected <- switch(
+      page,
+      "Principle Component Plots" =  d.PLOT.PCA(),
+      "Correlation Analysis" = d.PLOT.CORRELATION(),
+      "Gene Counts" = d.PLOT.GENE(),
+      "Volcano Plot" = d.PLOT.VOLCANO(),
+      "Term Enrichment" = p.PLOT.ENRICHMENT(),
+      "Term Gene Heatmap" = p.PLOT.LARGEMAP(),
+      "Case vs. Control" = p.PLOT.CASEENRICHMENT(),
+      "Single Pathway vs. Samples" = p.PLOT.PATHWAY(),
+    )
+    
+    #determine wanted settings
+    #All options = tit, cap, sub, ar, w, h, tsa
+    wantedModules <- switch(
+      page,
+      "Principle Component Plots" =  c("tit", "cap", "sub", "ar", "w", "h", "tsa"),
+      "Correlation Analysis" = c("tit", "cw", "ch", "tsa", "h", "w"),
+      "Gene Counts" = c("tit", "cap", "sub", "w", "h", "tsa", "ar"),
+      "Volcano Plot" = c(""),
+      "Term Enrichment" = c(""),
+      "Term Gene Heatmap" = c(""),
+      "Case vs. Control" = c(""),
+      "Single Pathway vs. Samples" = c(""),
+    )
+    
+    #Formulate event ID
+    eventID <- paste0("confirm_settings_", settings.EventID())
+    
+    advancedSettingsModal(eventID, 
+                           plotSettingsHub()[[selected_key]],
+                           input,
+                           wantedModules)
+    
+    ###########REMOVING SETTINGS
+    observeEvent(input[[paste0(eventID, "_scrapSettings")]], {
+     
+      removeModal()
+      
+      current_settings <- plotSettingsHub()
+      
+      plot_settings <- current_settings[[selected_key]]
+      
+      #Set original default
+      #Do utext updates but only if there is a new input 
+      if("Title" %in% names(plot_settings)){plot_settings$Title <- ""}
+      if("Subtitle" %in% names(plot_settings)){plot_settings$Subtitle <- ""}
+      if("Caption" %in% names(plot_settings)){plot_settings$Caption <- ""}
+      
+      #Sizings
+      if("TSA" %in% names(plot_settings)){plot_settings$TSA <- 0}
+      if("Width" %in% names(plot_settings)){plot_settings$Width <- "auto"}
+      if("Height" %in% names(plot_settings)){plot_settings$Height <- "auto"}
+      if("Aspect" %in% names(plot_settings) ){plot_settings$Aspect <- "auto"}
+      if("CellWidth" %in% names(plot_settings)){plot_settings$CellWidth <- "auto"}
+      if("CellHeight" %in% names(plot_settings)){plot_settings$CellHeight <- "auto"}
+      
+      #reinsert to reactive hub
+      current_settings[[selected_key]] <- plot_settings
+      plotSettingsHub(current_settings)
+      
+    })
+    
+    ########APPLYING SETTINGS
+    observeEvent(input[[paste0(eventID, "_applySettings")]], {
+      
+      removeModal()
+      
+      current_settings <- plotSettingsHub()
+      
+      plot_settings <- current_settings[[selected_key]]
+      print(plot_settings)
+      print("__________________________")
+      #Do utext updates but only if there is a new input 
+      if("Title" %in% names(plot_settings)){plot_settings$Title <- input[[paste0(eventID, "_title")]]}
+      if("Subtitle" %in% names(plot_settings)){plot_settings$Subtitle <- input[[paste0(eventID, "_subtitle")]]}
+      if("Caption" %in% names(plot_settings)){plot_settings$Caption <- input[[paste0(eventID, "_caption")]]}
+      
+      #Sizings
+      if("TSA" %in% names(plot_settings)){plot_settings$TSA <- input[[paste0(eventID, "_textSizeAdjustment")]]}
+      if("Width" %in% names(plot_settings)){plot_settings$Width <- input[[paste0(eventID, "_width")]]}
+      if("Height" %in% names(plot_settings)){plot_settings$Height <- input[[paste0(eventID, "_height")]]}
+      if("Aspect" %in% names(plot_settings) ){plot_settings$Aspect <- switch(
+        input[[paste0(eventID, "_aspect")]],
+        "1:1" = 1,
+        "4:3" = 4/3,
+        "3:4" = 3/4,
+        "16:9" = 16/9,
+        "9:16" = 9/16,
+        "auto" = "auto"
+      )}
+      if("CellWidth" %in% names(plot_settings)){
+       
+       
+        if(input[[paste0(eventID, "_autoCellWidth")]] == TRUE){
+         
+          plot_settings$CellWidth <- "auto"
+        }
+        if(input[[paste0(eventID, "_autoCellWidth")]] == FALSE){
+          
+          plot_settings$CellWidth <- input[[paste0(eventID, "_cellWidth")]]
+        }
+        
+      }
+      if("CellHeight" %in% names(plot_settings)){
+        
+        if(input[[paste0(eventID, "_autoCellHeight")]] == TRUE){
+          
+          plot_settings$CellHeight <- "auto"
+        }
+        if(input[[paste0(eventID, "_autoCellHeight")]] == FALSE){
+          
+          plot_settings$CellHeight <- input[[paste0(eventID, "_cellHeight")]]
+        }
+        
+      }
+      
+      #reinsert into reactive object
+      current_settings[[selected_key]] <- plot_settings
+      plotSettingsHub(current_settings)
+      
+    })
+    
+  })
+  
+  
+  
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#----
 #~~~~~######____________Output $ Objects______________######~~~~~#
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
@@ -1144,39 +1405,26 @@ server <- function(input, output, session) {
     
     # The principle component plot
     output$principle_component_plots_ui <- renderUI({
+     
+      settings <- plotSettingsHub()
       
-      #LOCALIZE VARIABLES
-      vst <- RCV.VST_OBJ()
+      #Form stuff
+      pca <- pcaPlot(input, RCV.VST_OBJ(), settings$d.PLOT.PCA.SET)
       
-      if(is.null(vst)){return()}
-      if(length(input$pca_cond) == 0){return()}
-      
-      pca_plot <- principlePlot(vst, 
-                                input$pca_cond, 
-                                input$pca_nrow, 
-                                input$title_pca_plot, 
-                                input$subtitle_pca_plot, 
-                                input$caption_pca_plot)
-      
-      #RENDER
-      output$principle_components <- renderPlot({pca_plot})
-      
-      #CHECK BEFORE SHOW
-      if(is.null(vst) || length(input$pca_cond) == 0){
-        return(span("No Data Yet, Or No Selected Factors",style="color: red;"))
-      }
+      #Set in output
+      output$pcaPlot <- pca$rendered
       
       #CREATE OUTPUT
-      p.out <- plotOutput('principle_components', height= "700px", width = "100%")
+      p.out <- plotOutput('pcaPlot', height = pca$h, width = pca$w)
       
       #SAVE
       d.PLOT.PCA(
         list(
           output = p.out, 
-          plot = pca_plot, 
-          class = class(pca_plot), 
-          h = "700px",
-          w = "800px"
+          plot = pca$plot, 
+          class = class(pca$plot), 
+          h = pca$h,
+          w = pca$w
         )
       )
       
@@ -1244,70 +1492,29 @@ server <- function(input, output, session) {
     output$heatmap_plot_ui <- renderUI({
       
       #LOCALIZE VARIABLES
-      counts <- RCV.VST_COUNTS()
-      meta_data <- RCV.META_DATA()
-      corr_anns <- input$corr_annotations
+      settings <- plotSettingsHub()
       
-      #ASSERT NEEDED VARIABLES
-      if(is.null(counts)){return()}
-        
-      #         CREATE CORRELATION MATRIX
-      # ___________________________________________
-      vst_cor <- cor(counts)
+      corr <- correlate(RCV.VST_COUNTS(), 
+                        RCV.META_DATA(),
+                        input$corr_annotations,
+                        settings$d.PLOT.CORRELATION.SET
+                        )
       
-      generate_palette <- function(factor_levels, base_colors = c("cornsilk3", "orchid")) {
-        # Check the number of unique factor levels
-        unique_levels <- unique(factor_levels)
-        num_levels <- length(unique_levels)
-        
-        # Generate the palette using colorRampPalette
-        palette <- colorRampPalette(base_colors)(num_levels)
-        
-        # Return a named vector mapping levels to colors
-        setNames(palette, unique_levels)
-      }
+      output$corr_analysis <- corr$rendered
       
-      ann_colors <- list()
-      
-      for(i in corr_anns){
-        if(nlevels(meta_data[[i]]) > 2){
-          add <- setNames(list(generate_palette(meta_data[[i]], base_colors = c("cadetblue", "white", "indianred"))), i)
-          ann_colors <- c(ann_colors, add)
-        }else{
-          add <- setNames(list(generate_palette(meta_data[[i]])), i)
-          ann_colors <- c(ann_colors, add)
-        }
-      }
-      
-      toAnnotate <- meta_data %>% select(all_of(head(corr_anns, 5))) 
-      ann_colors <- head(ann_colors, 5)
-      
-      p <- pheatmap(
-              vst_cor, 
-              angle_col = "45", 
-              main = input$title_heatmap_plot, 
-              annotation_row = if (nrow(toAnnotate) > 0 && ncol(toAnnotate) > 0) 
-                toAnnotate else NA,
-              annotation_colors = if (nrow(toAnnotate) > 0 && ncol(toAnnotate) > 0) 
-                ann_colors else NA,
-              fontsize = 20,
-              cellwidth = 650 / nrow(vst_cor),
-              cellheight = 650 / nrow(vst_cor)
-            )
-      
-      output$heatmap_plot_1 <- renderPlot({(p)})
-      
+      print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~````")
+      print(corr)
       #RENDER UI
-      p.out <- plotOutput('heatmap_plot_1', height = "1200px", width = "100%")
+      p.out <- plotOutput('corr_analysis', height = corr$h, width = corr$w )
       
       #SAVE
       d.PLOT.CORRELATION(
         list(
           output = p.out, 
-          plot = p, 
-          class = class(p), 
-          h = "1200px", 
-          w = "1200px"
+          plot = corr$plot, 
+          class = class(corr$plot), 
+          h = corr$h, 
+          w = corr$w
         )
       )
       
@@ -1407,83 +1614,75 @@ server <- function(input, output, session) {
 
     })
     
+    output$g_search_checkbox <- renderUI({
+      
+      meta_data <- RCV.META_DATA()
+      
+      checkboxGroupInput(
+        'gene_count_search_cond', 
+        'Meta data conditions to view, first 4 are considered with mapping order (x, color, shape, size)', 
+        choices=colnames(meta_data),
+        selected=head(colnames(meta_data),4),
+        inline=TRUE
+      )
+    })
+    
     # A ui for displaying the search method 
     output$gene_count_search <- renderUI({
       
-      #LOCALIZE VARIABLES
-      results <- RCV.RESULTS_DDSC()
+      #Set vairables
+      res <- RCV.RESULTS_DDSC() 
       norm <- RCV.NORMALIZED_COUNTS()
       meta_data <- RCV.META_DATA()
-      
-      if(is.null(results) || is.null(norm)){
-        return(span("No Data Yet",style="color: red;"))
-      }
-      
-      #SETUP COUNTS
-      counts <- data.frame(round(norm)) 
-      counts$gene_name <- rownames(counts) %>% tolower()
-      
-      #SETUP RESULTS
-      results$gene_name <- rownames(results) %>% tolower()
-      results <- results %>% select(gene_name, padj, log2FoldChange)
-      
-      #MERGE COUNTS AND RESULTS
-      data <- left_join(results, counts)
-      
-      div(
-        
-        textInput("gplop_searched",
-                  "Search and plot a gene", 
-                  NULL),
-        
-        checkboxGroupInput('gene_count_plot_search_cond', 
-                            'Meta data conditions to view, first 4 are considered with mapping order (x, color, shape, size)', 
-                            choices=colnames(meta_data),
-                            selected=head(colnames(meta_data),4),
-                            inline=TRUE),
-        renderUI({
-          
-          if(!is.null(input$gplop_searched)){
-            
-            #EDIT SEARCH
-            g <- input$gplop_searched %>% tolower()
-            
-            #PULL SEARCH
-            res <- data %>% filter(gene_name == g)
-            print(res)
-            
-            #ASSERT SINGLE ROW
-            if(is.null(res) || ncol(res) == 0 || nrow(res) == 0){
-              return()
-            }
-            if(nrow(res) > 1 ){
-              res <- res[1,]
-            }
-            
-            plot <- gplop(res, meta_data, input$gene_count_plot_search_cond)
-            output$sGene <- renderPlot({plot})
-            p.out <- plotOutput('sGene')
-            
-            #saving
-            d.PLOT.GENE(
-              list(
-                output = p.out, 
-                plot = plot, 
-                class = class(plot), 
-                h = "800px", 
-                w = "800px"
-              )
-            )
+      settings <- plotSettingsHub()
 
-            #print
-            p.out
-            
-          }else{
-            p("Nothing Here Yet")
-          }
+      div(
+        renderUI({
+          #Set vairables
+          res <- RCV.RESULTS_DDSC() 
+          norm <- RCV.NORMALIZED_COUNTS()
+          meta_data <- RCV.META_DATA()
+          
+          settings <- plotSettingsHub()
+          
+          plot_data <- singleGenePlot(
+            res, 
+            norm,
+            meta_data,
+            input$gene_count_search_cond,
+            input$gplop_searched,
+            settings$d.PLOT.GENE.SET
+          )
+          
+          output$S_gene_plot <- plot_data$rendered
+          p.out <- plotOutput('S_gene_plot', width = plot_data$w, height = plot_data$h)
+          
+          #saving
+          d.PLOT.GENE(
+            list(
+              output = p.out, 
+              plot = plot_data$plot, 
+              class = class(plot_data$plot), 
+              h = plot_data$h, 
+              w = plot_data$w
+            )
+          )
+          
+          # p$labels$title      # Main Title
+          # p$labels$subtitle   # Subtitle
+          # p$labels$caption  
+          settings <- plotSettingsHub()
+          settings$d.PLOT.GENE.SET$Title <- plot_data$plot$labels$title
+          settings$d.PLOT.GENE.SET$Subtitle <- plot_data$plot$labels$subtitle
+          settings$d.PLOT.GENE.SET$Caption <- plot_data$plot$labels$caption
+          
+          plotSettingsHub(settings)
+          print("_____________")
+          print(plot_data$plot$labels)
+          p.out
           
         })
-
+        
       )
     })
     
@@ -2231,5 +2430,4 @@ server <- function(input, output, session) {
     })
     
 #----
-} #X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X
-
+  } #X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X#X

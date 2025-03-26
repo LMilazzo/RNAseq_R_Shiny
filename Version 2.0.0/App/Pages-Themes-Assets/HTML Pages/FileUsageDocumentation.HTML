@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Usage Documentation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+        }
+        h1, h2, h3 {
+            color: white;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: ;
+        }
+        .example {
+            background-color: ;
+            padding: 10px;
+            border-left: 4px solid #007BFF;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>File Usage Documentation</h1>
+    <h2>Basic File Rules</h2>
+    <ul>
+        <li>Headers are case sensitive.</li>
+        <li>All files should be CSV or TSV format.</li>
+        <li>All listed required columns must be present for the file to be accepted.</li>
+        <li>Any ID-type columns must not have duplicate values.</li>
+        <li>All sample columns must include a header that starts with a <code>.</code> character to be identified by the application.</li>
+    </ul>
+
+    <h2>File Type Summaries and Examples</h2>
+    <h3>1. Metadata File</h3>
+    <p>Maps each sample to a row of variables that describe the sample.</p>
+    <h4>Required Columns:</h4>
+    <ul>
+        <li><code>sample</code>: Contains the sample names, which should match the sample names in other uploaded files. (The application automatically prepends a <code>.</code> to sample names if missing.)</li>
+    </ul>
+    <h4>Example:</h4>
+    <div class="example">
+        <table>
+            <tr><th>sample</th><th>condition</th></tr>
+            <tr><td>.sample1</td><td>treatment</td></tr>
+            <tr><td>.sample2</td><td>control</td></tr>
+            <tr><td>.sample3</td><td>treatment</td></tr>
+        </table>
+    </div>
+
+    <h3>2. Raw Count Table</h3>
+    <p>A matrix of counts representing the number of times each gene occurred within each sample.</p>
+    <h4>Required Columns:</h4>
+    <ul>
+        <li><code>gene_id</code>: Unique identifier for each gene.</li>
+        <li><code>gene_name</code>: Name of the gene (recommended to represent actual genes).</li>
+        <li>Sample columns: Contain raw count data.</li>
+    </ul>
+    <h4>Example:</h4>
+    <div class="example">
+        <table>
+            <tr><th>gene_id</th><th>gene_name</th><th>.sample1</th><th>.sample2</th><th>.sample3</th></tr>
+            <tr><td>G1</td><td>NME1</td><td>100</td><td>200</td><td>150</td></tr>
+            <tr><td>G2</td><td>AK1</td><td>50</td><td>75</td><td>60</td></tr>
+            <tr><td>G3</td><td>AK6</td><td>400</td><td>410</td><td>420</td></tr>
+        </table>
+    </div>
+
+    <h3>3. Differential Expression Analysis Results Output</h3>
+    <p>Not all the columns that are returned from DESeq2 are required to use this file. DESeq2 does not append the sample counts to the results, rather this must be done manually before uploading with the DESeq results and the normalized counts matrix given by DESeq2.</p>
+    <h4>Required Columns:</h4>
+    <ul>
+        <li><code>gene_id</code>: Unique identifier for each gene.</li>
+        <li><code>gene_name</code>: Name of the gene.</li>
+        <li><code>log2FoldChange</code>: Log2 fold change value.</li>
+        <li><code>padj</code>: Adjusted p-value.</li>
+    </ul>
+    <h4>Example:</h4>
+    <div class="example">
+        <table>
+            <tr><th>gene_id</th><th>gene_name</th><th>log2FoldChange</th><th>padj</th><th>.sample1</th><th>.sample2</th></tr>
+            <tr><td>G13</td><td>DCK</td><td>-1.2</td><td>0.05</td><td>120</td><td>100</td></tr>
+            <tr><td>G65</td><td>ADSS2</td><td>2.3</td><td>0.01</td><td>210</td><td>230</td></tr>
+            <tr><td>G4</td><td>ADSL</td><td>1.8</td><td>0.003</td><td>400</td><td>450</td></tr>
+        </table>
+    </div>
+
+    <h3>4. Abundance Data File</h3>
+    <p>A matrix of normalized counts for each gene and sample to be used in the pathway analysis portion of the application. The normalized counts can be retrieved from a DESeq2 experiment and modified to the required format.</p>
+    <h4>Required Columns:</h4>
+    <ul>
+        <li><code>gene_name</code>: Name of the gene (must represent actual genes).</li>
+        <li>Sample columns: Contain normalized count data.</li>
+    </ul>
+    <h4>Example:</h4>
+    <div class="example">
+        <table>
+            <tr><th>gene_name</th><th>.sample1</th><th>.sample2</th><th>.sample3</th></tr>
+            <tr><td>ENPP3</td><td>1.2</td><td>1.1</td><td>1.3</td></tr>
+            <tr><td>APRT</td><td>1.6</td><td>1.5</td><td>1.4</td></tr>
+            <tr><td>RRM2</td><td>2.1</td><td>2.2</td><td>2.0</td></tr>
+        </table>
+    </div>
+
+    <h3>5. Previous Pathway Analysis Results Output</h3>
+<p>
+  The output/results from a previous <code>pathfindR</code> pathway analysis experiment. 
+  The results must include a clustered column, as <code>pathfindR</code> clusters pathways automatically.
+</p>
+<h4>Required Columns:</h4>
+<ul>
+  <li><code>ID</code>: Unique identifier for each pathway.</li>
+  <li><code>Term_Description</code>: Name of the pathway.</li>
+  <li><code>Fold_Enrichment</code>: Fold enrichment value.</li>
+  <li><code>occurrence</code>: Integer representing the number of occurrences of the pathway.</li>
+  <li><code>support</code>: Float value representing the pathway's support.</li>
+  <li><code>lowest_p</code>: Lowest p-value in the pathway.</li>
+  <li><code>highest_p</code>: Highest p-value in the pathway.</li>
+  <li><code>non_Signif_Snw_Genes</code>: Comma-separated list of non-significant genes in the pathway.</li>
+  <li><code>Up_regulated</code>: Comma-separated list of upregulated genes.</li>
+  <li><code>Down_regulated</code>: Comma-separated list of downregulated genes.</li>
+  <li><code>all_pathway_genes</code>: Comma-separated list of all genes in the pathway.</li>
+  <li><code>num_genes_in_path</code>: Number of genes in the pathway.</li>
+  <li><code>Cluster</code>: Cluster ID (integer).</li>
+  <li><code>Status</code>: Either <code>Representative</code> or <code>Member</code>.</li>
+</ul>
+<h4>Example:</h4>
+<div class="example">
+  <table>
+    <tr>
+      <th>ID</th>
+      <th>Term_Description</th>
+      <th>Fold_Enrichment</th>
+      <th>occurrence</th>
+      <th>support</th>
+      <th>lowest_p</th>
+      <th>highest_p</th>
+      <th>Cluster</th>
+      <th>Status</th>
+      <th>non_Signif_Snw_Genes</th>
+      <th>Up_regulated</th>
+      <th>Down_regulated</th>
+      <th>all_pathway_genes</th>
+      <th>num_genes_in_path</th>
+    </tr>
+    <tr>
+      <td>P01</td>
+      <td>Prion Disease</td>
+      <td>2.5</td>
+      <td>5</td>
+      <td>0.8</td>
+      <td>0.0001</td>
+      <td>0.1</td>
+      <td>1</td>
+      <td>Representative</td>
+      <td>GMPS, CMPK1</td>
+      <td>TK1, DUT</td>
+      <td>TYMS, CTPS1</td>
+      <td>GMPS, CMPK1, TK1, DUT, TYMS, CTPS1</td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <td>P02</td>
+      <td>Huntington Disease</td>
+      <td>1.8</td>
+      <td>3</td>
+      <td>0.5</td>
+      <td>0.00003</td>
+      <td>0.02</td>
+      <td>2</td>
+      <td>Member</td>
+      <td>UCK2, NT5C3B</td>
+      <td>HPRT1, IMPDH2</td>
+      <td></td>
+      <td>UCK2, NT5C3B, HPRT1, IMPDH2</td>
+      <td>4</td>
+    </tr>
+  </table>
+</div>
+
+
+<h2>When to Use Each File</h2>
+<p>The application can be experienced in its entirety with the use of just the two following files: <strong>Metadata</strong> and <strong>Raw Counts Table</strong>.</p>
+<ol>
+    <li><strong>Metadata</strong> files are required with any use of the application.</li>
+    <li><strong>Raw Count Table</strong> is used when a new Differential Gene Expression Analysis needs to be done. The application can then directly run the results into the pathway analysis portion of the application.</li>
+</ol>
+<p>The next three files are useful if an experiment has already been done outside of the application with DESeq2 or pathfindR and the user just wants access to the visuals the application provides. This allows more flexibility if the user wishes to do advanced experimental designs, formulas, or custom filtering of the results, which are not accessible within the application. The downside, however, is that some features may become unavailable due to missing information.</p>
+<ol start="3">
+    <li><strong>Differential Expression Analysis Results Output</strong> is used in conjunction with a <strong>Metadata</strong> file to skip the process of running DESeq2 and to just visualize results that have already been acquired. After uploading these two files, you may also directly pass them into the pathway analysis portion of the application without uploading anything else.</li>
+    <li><strong>Abundance Data</strong> and <strong>Pathway Analysis Results Output</strong> may be used in conjunction with <strong>Metadata</strong> to bypass the rest of the application and just visualize and explore previously acquired results from a pathway analysis. An abundance data file is not required to use this method; however, some features may not be available without it.</li>
+</ol>
+
+</body>
+</html>

@@ -29,3 +29,9 @@ savePlotButton <- function(){
   return(actionButton("save", "SAVE", style = "background-color: #4CAF50 ; color: black; border-color: white; background-image: none;"))
   
 }
+
+advancedSettingsButton <- function(){
+  
+  return(actionButton("advancedSettingsButton", label = "Advanced Plot Settings"))
+  
+}

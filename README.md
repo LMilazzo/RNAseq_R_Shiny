@@ -13,7 +13,7 @@ For questions please reach out to
   - ljm04280@vsc.edu
 
 
-Note:
-
-    - A new version is currently in progress that will optimize and provide more options for users as well as improve plot sizing custimizability when saving.
+Please Note:
+    - A new version is currently in progress in the "Version 2.0.0 Directory" that will optimize and provide more options for users as well as improve plot sizing custimizability when saving.
+    - This version currently does not support Pathway Enrichment Analysis and must be opened by running either the App.R or Server.R scripts.
 
